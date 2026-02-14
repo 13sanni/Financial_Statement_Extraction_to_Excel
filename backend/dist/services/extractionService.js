@@ -4,6 +4,7 @@ exports.detectYears = detectYears;
 exports.detectCurrency = detectCurrency;
 exports.detectUnits = detectUnits;
 exports.extractStatementRows = extractStatementRows;
+exports.selectCandidateFinancialLines = selectCandidateFinancialLines;
 const LINE_ITEM_PATTERNS = [
     { normalized: "Revenue", patterns: [/\brevenue\b/i, /\bsales\b/i, /\btotal income\b/i] },
     { normalized: "Cost of Revenue", patterns: [/\bcost of revenue\b/i, /\bcost of sales\b/i] },
@@ -13,32 +14,89 @@ const LINE_ITEM_PATTERNS = [
     { normalized: "Net Income", patterns: [/\bnet income\b/i, /\bprofit for the year\b/i, /\bprofit attributable\b/i] },
     { normalized: "EPS", patterns: [/\bearnings per share\b/i, /\beps\b/i] },
 ];
-function detectYears(text) {
-    const years = new Set();
-    const matches = text.match(/\b(19|20)\d{2}\b/g) || [];
-    for (const year of matches) {
-        years.add(year);
+const MIN_REPORTING_YEAR = 1990;
+const MAX_REPORTING_YEAR = new Date().getUTCFullYear() + 1;
+function findContextSnippets(text) {
+    const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+    return lines.filter((line) => /(currency|amounts?\s+in|stated\s+in|presented\s+in|in\s+millions?|in\s+billions?|in\s+thousands?)/i.test(line));
+}
+function collectYearCounts(source) {
+    const counts = new Map();
+    const matches = source.match(/\b(19\d{2}|20\d{2})\b/g) || [];
+    for (const token of matches) {
+        const year = Number(token);
+        if (year < MIN_REPORTING_YEAR || year > MAX_REPORTING_YEAR) {
+            continue;
+        }
+        counts.set(year, (counts.get(year) ?? 0) + 1);
     }
-    return [...years].sort((a, b) => Number(b) - Number(a)).slice(0, 4);
+    return counts;
+}
+function toSortedYears(counts) {
+    return [...counts.entries()]
+        .sort((a, b) => {
+        if (b[1] !== a[1])
+            return b[1] - a[1];
+        return b[0] - a[0];
+    })
+        .map(([year]) => String(year));
+}
+function detectYears(text) {
+    const contextMatches = text.match(/(?:fiscal\s+year|years?\s+ended|year\s+ended|for\s+the\s+years?\s+ended)[^\n]{0,150}/gi);
+    if (contextMatches?.length) {
+        const contextCounts = collectYearCounts(contextMatches.join("\n"));
+        const contextYears = toSortedYears(contextCounts);
+        if (contextYears.length) {
+            return contextYears.slice(0, 4);
+        }
+    }
+    const globalCounts = collectYearCounts(text);
+    const ranked = [...globalCounts.entries()].sort((a, b) => {
+        if (b[1] !== a[1])
+            return b[1] - a[1];
+        return b[0] - a[0];
+    });
+    const stableYears = ranked.filter(([, count]) => count >= 2).map(([year]) => String(year));
+    if (stableYears.length) {
+        return stableYears.slice(0, 4);
+    }
+    return ranked.map(([year]) => String(year)).slice(0, 4);
 }
 function detectCurrency(text) {
-    if (/\bUSD\b|\$|US dollars?/i.test(text))
+    const snippets = findContextSnippets(text).join("\n");
+    const source = snippets || text;
+    if (/\b(USD|US dollars?|U\.S\. dollars?)\b/i.test(source))
         return "USD";
-    if (/\bINR\b|Rs\.?|Rupees?/i.test(text))
+    if (/\b(INR|Indian rupees?|Rupees?)\b|(?:^|[^\w])Rs\.?(?:[^\w]|$)/i.test(source))
         return "INR";
-    if (/\bEUR\b|€|Euros?/i.test(text))
+    if (/\b(EUR|Euros?)\b/i.test(source))
         return "EUR";
-    if (/\bGBP\b|£|Pounds?/i.test(text))
+    if (/\b(GBP|Pounds? sterling)\b/i.test(source))
+        return "GBP";
+    // Symbol-only fallback if no explicit currency text was found.
+    if (/\$/i.test(source))
+        return "USD";
+    if (/€/i.test(source))
+        return "EUR";
+    if (/£/i.test(source))
         return "GBP";
     return "UNKNOWN";
 }
 function detectUnits(text) {
-    if (/\bin billions?\b/i.test(text))
+    const snippets = findContextSnippets(text).join("\n");
+    const source = snippets || text;
+    if (/\b(amounts?|figures?|statements?|values?)\s+(are\s+)?(?:presented|stated|reported)?\s*in\s+billions?\b/i.test(source) || /\bin\s+billions?\b/i.test(source)) {
         return "billions";
-    if (/\bin millions?\b/i.test(text))
+    }
+    if (/\b(amounts?|figures?|statements?|values?)\s+(are\s+)?(?:presented|stated|reported)?\s*in\s+millions?\b/i.test(source) || /\bin\s+millions?\b/i.test(source)) {
         return "millions";
-    if (/\bin thousands?\b/i.test(text))
+    }
+    if (/\b(amounts?|figures?|statements?|values?)\s+(are\s+)?(?:presented|stated|reported)?\s*in\s+thousands?\b/i.test(source) || /\bin\s+thousands?\b/i.test(source)) {
         return "thousands";
+    }
     return "unknown";
 }
 function extractNumbersFromLine(line) {
@@ -86,4 +144,16 @@ function extractStatementRows(documentName, text) {
         });
     }
     return rows;
+}
+function selectCandidateFinancialLines(text, maxLines = 220) {
+    const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.replace(/\s+/g, " ").trim())
+        .filter(Boolean);
+    const financialLines = lines.filter((line) => {
+        const hasMoneyToken = /\(?-?\d[\d,]*(?:\.\d+)?\)?/.test(line);
+        const hasKeyword = /\b(revenue|sales|income|expense|profit|loss|operating|ebit|eps|earnings|cost)\b/i.test(line);
+        return hasMoneyToken && hasKeyword;
+    });
+    return financialLines.slice(0, maxLines);
 }

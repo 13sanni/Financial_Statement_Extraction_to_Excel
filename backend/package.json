@@ -12,7 +12,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/genai": "^1.41.0",
     "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "multer": "^2.0.2",

@@ -9,26 +9,16 @@ async function buildIncomeStatementWorkbook(rows, metadata) {
     const workbook = new exceljs_1.default.Workbook();
     const extractionSheet = workbook.addWorksheet("IncomeStatement");
     const metadataSheet = workbook.addWorksheet("Metadata");
-    const metadataByDocument = new Map(metadata.map((item) => [item.documentName, item]));
-    const allYears = [...new Set(metadata.flatMap((item) => item.years))]
-        .sort((a, b) => Number(b) - Number(a))
-        .slice(0, 4);
-    const baseColumns = [
+    extractionSheet.columns = [
         { header: "Document", key: "documentName", width: 28 },
         { header: "Line Item", key: "normalizedLineItem", width: 24 },
-        { header: "Currency", key: "currency", width: 14 },
-        { header: "Units", key: "units", width: 12 },
-        { header: "Confidence", key: "confidence", width: 12 },
+        { header: "Value 1", key: "value1", width: 14 },
+        { header: "Value 2", key: "value2", width: 14 },
+        { header: "Value 3", key: "value3", width: 14 },
+        { header: "Value 4", key: "value4", width: 14 },
         { header: "Ambiguity Note", key: "ambiguity", width: 36 },
-        { header: "Missing Reason", key: "missingReason", width: 30 },
         { header: "Raw Line", key: "rawLine", width: 80 },
     ];
-    const yearColumns = allYears.map((year) => ({
-        header: year,
-        key: `year_${year}`,
-        width: 14,
-    }));
-    extractionSheet.columns = [...baseColumns, ...yearColumns];
     metadataSheet.columns = [
         { header: "Document", key: "documentName", width: 28 },
         { header: "Detected Years", key: "years", width: 24 },
@@ -47,45 +37,18 @@ async function buildIncomeStatementWorkbook(rows, metadata) {
         extractionSheet.addRow({
             documentName: "",
             normalizedLineItem: "NOT_FOUND",
-            confidence: 0,
             ambiguity: "No recognizable income-statement rows were extracted",
-            missingReason: "No rows extracted from input document(s)",
             rawLine: "",
         });
     }
     else {
         for (const row of rows) {
-            const rowMetadata = metadataByDocument.get(row.documentName);
-            const rowYears = rowMetadata?.years ?? [];
-            const yearMappedValues = {};
-            let extraValuesDetected = false;
-            for (const year of allYears) {
-                yearMappedValues[`year_${year}`] = null;
-            }
-            for (let i = 0; i < row.values.length; i += 1) {
-                const year = rowYears[i];
-                if (!year) {
-                    extraValuesDetected = true;
-                    continue;
-                }
-                yearMappedValues[`year_${year}`] = row.values[i] ?? null;
-            }
-            const missingReason = row.normalizedLineItem === "NOT_FOUND"
-                ? row.ambiguity
-                : rowYears.length === 0
-                    ? "Detected years missing; values not mapped"
-                    : "";
             extractionSheet.addRow({
                 ...row,
-                currency: rowMetadata?.currency ?? "UNKNOWN",
-                units: rowMetadata?.units ?? "unknown",
-                missingReason,
-                ambiguity: extraValuesDetected && row.ambiguity
-                    ? `${row.ambiguity}; values exceeded detected years`
-                    : extraValuesDetected
-                        ? "Values exceeded detected years"
-                        : row.ambiguity,
-                ...yearMappedValues,
+                value1: row.values[0] ?? null,
+                value2: row.values[1] ?? null,
+                value3: row.values[2] ?? null,
+                value4: row.values[3] ?? null,
             });
         }
     }
