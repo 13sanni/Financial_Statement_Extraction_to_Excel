@@ -5,15 +5,16 @@ exports.getUploadQueue = getUploadQueue;
 exports.getRuns = getRuns;
 exports.getDownloads = getDownloads;
 const researchPortalService_1 = require("../services/researchPortalService");
+const researchPortalValidationService_1 = require("../services/researchPortalValidationService");
 function getSummary(_req, res) {
-    res.json((0, researchPortalService_1.getPortalSummary)());
+    res.json((0, researchPortalValidationService_1.validatePortalSummary)((0, researchPortalService_1.getPortalSummary)()));
 }
 function getUploadQueue(_req, res) {
-    res.json((0, researchPortalService_1.getPortalUploadQueue)());
+    res.json((0, researchPortalValidationService_1.validatePortalUploadQueue)((0, researchPortalService_1.getPortalUploadQueue)()));
 }
 function getRuns(_req, res) {
-    res.json((0, researchPortalService_1.getPortalRuns)());
+    res.json((0, researchPortalValidationService_1.validatePortalRuns)((0, researchPortalService_1.getPortalRuns)()));
 }
 function getDownloads(_req, res) {
-    res.json((0, researchPortalService_1.getPortalDownloads)());
+    res.json((0, researchPortalValidationService_1.validatePortalDownloads)((0, researchPortalService_1.getPortalDownloads)()));
 }
