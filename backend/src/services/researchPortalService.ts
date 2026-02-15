@@ -1,3 +1,6 @@
+import { hasMongoConfig } from "../config/env";
+import { ExtractionRunModel } from "../models/extractionRun";
+
 type SummaryCard = {
   label: string;
   value: string;
@@ -53,52 +56,18 @@ type DownloadsOptions = PaginationOptions & {
   sort: "recent" | "size-desc" | "size-asc";
 };
 
-const summaryCards: SummaryCard[] = [
-  { label: "Statements Processed", value: "128", delta: "+14 this week" },
-  { label: "Queued for Extraction", value: "6", delta: "2 urgent" },
-  { label: "Accuracy Score", value: "98.3%", delta: "Last 30 days" },
-  { label: "Excel Packages Ready", value: "41", delta: "7 generated today" },
-];
-
-const uploadQueue: UploadQueueItem[] = [
-  { company: "North Ridge Energy", period: "Q3 2025", pages: 83, uploadedBy: "A. Reed" },
-  { company: "Harbor Capital Bank", period: "FY 2025", pages: 142, uploadedBy: "S. Patel" },
-  { company: "Orion Retail Group", period: "Q4 2025", pages: 67, uploadedBy: "J. Kim" },
-];
-
-const runs: RunItem[] = [
-  {
-    id: "RUN-2318",
-    company: "North Ridge Energy",
-    started: "10:32 AM",
-    status: "processing",
-    confidence: "97.9%",
-  },
-  {
-    id: "RUN-2317",
-    company: "Harbor Capital Bank",
-    started: "9:58 AM",
-    status: "completed",
-    confidence: "99.1%",
-  },
-  {
-    id: "RUN-2316",
-    company: "Orion Retail Group",
-    started: "9:21 AM",
-    status: "review",
-    confidence: "95.8%",
-  },
-];
-
-const downloads: DownloadItem[] = [
-  { file: "NorthRidge_Q3_2025.xlsx", generatedAt: "Today, 10:41 AM", size: "1.2 MB" },
-  { file: "HarborCapital_FY_2025.xlsx", generatedAt: "Today, 10:05 AM", size: "1.8 MB" },
-  { file: "OrionRetail_Q4_2025.xlsx", generatedAt: "Today, 9:43 AM", size: "940 KB" },
-];
-
-function cloneRows<T extends Record<string, unknown>>(rows: T[]): T[] {
-  return rows.map((row) => ({ ...row }));
-}
+type RunRecord = {
+  runId: string;
+  status: "completed" | "failed";
+  warnings: string[];
+  createdAt: Date;
+  uploadedPdfs: Array<{
+    originalName: string;
+    extractedRowCount: number;
+    years: string[];
+  }>;
+  outputExcel?: { fileName: string; sizeBytes: number } | undefined;
+};
 
 function paginateRows<T>(rows: T[], { page, pageSize }: PaginationOptions): PaginatedResult<T> {
   const totalItems = rows.length;
@@ -116,13 +85,107 @@ function parseSizeToKb(size: string): number {
   return Math.round(numeric);
 }
 
-export function getPortalSummary(): SummaryCard[] {
-  return cloneRows(summaryCards);
+function humanizeFileName(fileName: string): string {
+  const withoutExt = fileName.replace(/\.[^/.]+$/, "");
+  const clean = withoutExt.replace(/[_-]+/g, " ").trim();
+  return clean || fileName;
 }
 
-export function getPortalUploadQueue(options: UploadQueueOptions): PaginatedResult<UploadQueueItem> {
+function formatPeriod(years: string[]): string {
+  if (!years.length) return "Unknown Period";
+  const sorted = [...years].sort((a, b) => Number(b) - Number(a));
+  return `FY ${sorted[0]}`;
+}
+
+function formatTime(date: Date): string {
+  return new Date(date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+function formatDateTime(date: Date): string {
+  return new Date(date).toLocaleString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function calculateRunConfidencePercent(run: RunRecord): string {
+  const total = run.uploadedPdfs.length;
+  if (!total) return "0.0%";
+  const successful = run.uploadedPdfs.filter((item) => item.extractedRowCount > 0).length;
+  return `${((successful / total) * 100).toFixed(1)}%`;
+}
+
+async function loadRunsFromDb(): Promise<RunRecord[]> {
+  if (!hasMongoConfig()) return [];
+  const rows = await ExtractionRunModel.find()
+    .sort({ createdAt: -1 })
+    .select({
+      runId: 1,
+      status: 1,
+      warnings: 1,
+      createdAt: 1,
+      uploadedPdfs: 1,
+      outputExcel: 1,
+      _id: 0,
+    })
+    .lean<RunRecord[]>();
+  return rows;
+}
+
+export async function getPortalSummary(): Promise<SummaryCard[]> {
+  const runs = await loadRunsFromDb();
+  const statementsProcessed = runs.reduce((sum, run) => sum + run.uploadedPdfs.length, 0);
+  const completedRuns = runs.filter((run) => run.status === "completed").length;
+  const failedRuns = runs.filter((run) => run.status === "failed").length;
+  const totalRuns = completedRuns + failedRuns;
+  const successRate = totalRuns ? ((completedRuns / totalRuns) * 100).toFixed(1) : "0.0";
+  const exportsReady = runs.filter((run) => Boolean(run.outputExcel)).length;
+
+  return [
+    {
+      label: "Statements Processed",
+      value: String(statementsProcessed),
+      delta: `${completedRuns} completed runs`,
+    },
+    {
+      label: "Queued for Extraction",
+      value: "0",
+      delta: "Memory pipeline (no queue)",
+    },
+    {
+      label: "Accuracy Score",
+      value: `${successRate}%`,
+      delta: "Run success rate",
+    },
+    {
+      label: "Excel Packages Ready",
+      value: String(exportsReady),
+      delta: `${failedRuns} failed runs`,
+    },
+  ];
+}
+
+export async function getPortalUploadQueue(options: UploadQueueOptions): Promise<PaginatedResult<UploadQueueItem>> {
+  const runs = await loadRunsFromDb();
+  const uploadQueue = runs.flatMap((run) =>
+    run.uploadedPdfs.map((pdf) => ({
+      company: humanizeFileName(pdf.originalName),
+      period: formatPeriod(pdf.years),
+      pages: pdf.extractedRowCount,
+      uploadedBy: "System",
+    })),
+  );
+
   const normalizedQuery = options.query.toLowerCase();
-  const filtered = cloneRows(uploadQueue)
+  const filtered = uploadQueue
     .filter((item) => {
       if (!normalizedQuery) return true;
       const searchable = `${item.company} ${item.period} ${item.uploadedBy}`.toLowerCase();
@@ -137,9 +200,17 @@ export function getPortalUploadQueue(options: UploadQueueOptions): PaginatedResu
   return paginateRows(filtered, options);
 }
 
-export function getPortalRuns(options: RunsOptions): PaginatedResult<RunItem> {
+export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResult<RunItem>> {
+  const runItems: RunItem[] = (await loadRunsFromDb()).map((run) => ({
+    id: run.runId,
+    company: run.uploadedPdfs[0] ? humanizeFileName(run.uploadedPdfs[0].originalName) : "Unknown Company",
+    started: formatTime(run.createdAt),
+    status: run.status === "failed" ? "review" : "completed",
+    confidence: calculateRunConfidencePercent(run),
+  }));
+
   const normalizedQuery = options.query.toLowerCase();
-  const filtered = cloneRows(runs).filter((run) => {
+  const filtered = runItems.filter((run) => {
     const matchesQuery =
       !normalizedQuery || `${run.company} ${run.id} ${run.started}`.toLowerCase().includes(normalizedQuery);
     const matchesStatus = options.status === "all" || run.status === options.status;
@@ -149,9 +220,17 @@ export function getPortalRuns(options: RunsOptions): PaginatedResult<RunItem> {
   return paginateRows(filtered, options);
 }
 
-export function getPortalDownloads(options: DownloadsOptions): PaginatedResult<DownloadItem> {
+export async function getPortalDownloads(options: DownloadsOptions): Promise<PaginatedResult<DownloadItem>> {
+  const downloads: DownloadItem[] = (await loadRunsFromDb())
+    .filter((run) => Boolean(run.outputExcel))
+    .map((run) => ({
+      file: run.outputExcel?.fileName || `income_statement_${run.runId}.xlsx`,
+      generatedAt: formatDateTime(run.createdAt),
+      size: formatBytes(run.outputExcel?.sizeBytes || 0),
+    }));
+
   const normalizedQuery = options.query.toLowerCase();
-  const filtered = cloneRows(downloads)
+  const filtered = downloads
     .filter((download) => {
       if (!normalizedQuery) return true;
       return download.file.toLowerCase().includes(normalizedQuery);

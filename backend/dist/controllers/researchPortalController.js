@@ -6,18 +6,38 @@ exports.getRuns = getRuns;
 exports.getDownloads = getDownloads;
 const researchPortalService_1 = require("../services/researchPortalService");
 const researchPortalValidationService_1 = require("../services/researchPortalValidationService");
-function getSummary(_req, res) {
-    res.json((0, researchPortalValidationService_1.validatePortalSummary)((0, researchPortalService_1.getPortalSummary)()));
+async function getSummary(_req, res, next) {
+    try {
+        res.json((0, researchPortalValidationService_1.validatePortalSummary)(await (0, researchPortalService_1.getPortalSummary)()));
+    }
+    catch (error) {
+        next(error);
+    }
 }
-function getUploadQueue(req, res) {
-    const query = (0, researchPortalValidationService_1.validatePortalUploadQueueQuery)(req.query);
-    res.json((0, researchPortalValidationService_1.validatePortalUploadQueue)((0, researchPortalService_1.getPortalUploadQueue)(query)));
+async function getUploadQueue(req, res, next) {
+    try {
+        const query = (0, researchPortalValidationService_1.validatePortalUploadQueueQuery)(req.query);
+        res.json((0, researchPortalValidationService_1.validatePortalUploadQueue)(await (0, researchPortalService_1.getPortalUploadQueue)(query)));
+    }
+    catch (error) {
+        next(error);
+    }
 }
-function getRuns(req, res) {
-    const query = (0, researchPortalValidationService_1.validatePortalRunsQuery)(req.query);
-    res.json((0, researchPortalValidationService_1.validatePortalRuns)((0, researchPortalService_1.getPortalRuns)(query)));
+async function getRuns(req, res, next) {
+    try {
+        const query = (0, researchPortalValidationService_1.validatePortalRunsQuery)(req.query);
+        res.json((0, researchPortalValidationService_1.validatePortalRuns)(await (0, researchPortalService_1.getPortalRuns)(query)));
+    }
+    catch (error) {
+        next(error);
+    }
 }
-function getDownloads(req, res) {
-    const query = (0, researchPortalValidationService_1.validatePortalDownloadsQuery)(req.query);
-    res.json((0, researchPortalValidationService_1.validatePortalDownloads)((0, researchPortalService_1.getPortalDownloads)(query)));
+async function getDownloads(req, res, next) {
+    try {
+        const query = (0, researchPortalValidationService_1.validatePortalDownloadsQuery)(req.query);
+        res.json((0, researchPortalValidationService_1.validatePortalDownloads)(await (0, researchPortalService_1.getPortalDownloads)(query)));
+    }
+    catch (error) {
+        next(error);
+    }
 }

@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import {
   getPortalDownloads,
   getPortalRuns,
@@ -15,21 +15,37 @@ import {
   validatePortalUploadQueueQuery,
 } from "../services/researchPortalValidationService";
 
-export function getSummary(_req: Request, res: Response) {
-  res.json(validatePortalSummary(getPortalSummary()));
+export async function getSummary(_req: Request, res: Response, next: NextFunction) {
+  try {
+    res.json(validatePortalSummary(await getPortalSummary()));
+  } catch (error) {
+    next(error);
+  }
 }
 
-export function getUploadQueue(req: Request, res: Response) {
-  const query = validatePortalUploadQueueQuery(req.query);
-  res.json(validatePortalUploadQueue(getPortalUploadQueue(query)));
+export async function getUploadQueue(req: Request, res: Response, next: NextFunction) {
+  try {
+    const query = validatePortalUploadQueueQuery(req.query);
+    res.json(validatePortalUploadQueue(await getPortalUploadQueue(query)));
+  } catch (error) {
+    next(error);
+  }
 }
 
-export function getRuns(req: Request, res: Response) {
-  const query = validatePortalRunsQuery(req.query);
-  res.json(validatePortalRuns(getPortalRuns(query)));
+export async function getRuns(req: Request, res: Response, next: NextFunction) {
+  try {
+    const query = validatePortalRunsQuery(req.query);
+    res.json(validatePortalRuns(await getPortalRuns(query)));
+  } catch (error) {
+    next(error);
+  }
 }
 
-export function getDownloads(req: Request, res: Response) {
-  const query = validatePortalDownloadsQuery(req.query);
-  res.json(validatePortalDownloads(getPortalDownloads(query)));
+export async function getDownloads(req: Request, res: Response, next: NextFunction) {
+  try {
+    const query = validatePortalDownloadsQuery(req.query);
+    res.json(validatePortalDownloads(await getPortalDownloads(query)));
+  } catch (error) {
+    next(error);
+  }
 }
