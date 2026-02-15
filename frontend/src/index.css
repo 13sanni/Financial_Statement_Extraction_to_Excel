@@ -1,17 +1,11 @@
-* {
-  box-sizing: border-box;
-}
+@import "tailwindcss";
 
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  background: radial-gradient(circle at top left, #eef4ff 0%, var(--bg) 60%);
-  color: var(--text);
-  font-family: "Segoe UI", "Noto Sans", sans-serif;
-  line-height: 1.45;
-}
+@layer base {
+  body {
+    @apply m-0 min-h-screen min-w-80 bg-[radial-gradient(circle_at_top_left,#eef4ff_0%,#f4f7fb_60%)] font-sans leading-relaxed text-slate-900;
+  }
 
-#root {
-  min-height: 100vh;
+  #root {
+    @apply min-h-screen;
+  }
 }
