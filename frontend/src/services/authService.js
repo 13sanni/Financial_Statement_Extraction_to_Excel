@@ -26,3 +26,7 @@ export async function login({ email, password }) {
   setAuthToken(token);
   return token;
 }
+
+export async function register({ email, password }) {
+  await axios.post(`${API_BASE_URL}/auth/register`, { email, password });
+}

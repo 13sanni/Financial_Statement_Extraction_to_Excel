@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const crypto_1 = __importDefault(require("crypto"));
+const crypto_1 = require("crypto");
 const cors_1 = __importDefault(require("cors"));
 const express_1 = __importDefault(require("express"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
@@ -28,7 +28,7 @@ app.use((0, cors_1.default)({
 app.use(express_1.default.json({ limit: "2mb" }));
 app.use((req, res, next) => {
     const start = Date.now();
-    const requestId = crypto_1.default.randomUUID();
+    const requestId = (0, crypto_1.randomUUID)();
     res.setHeader("X-Request-Id", requestId);
     res.on("finish", () => {
         const duration = Date.now() - start;

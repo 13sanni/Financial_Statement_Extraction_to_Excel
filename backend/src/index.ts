@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import { randomUUID } from "crypto";
 import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
@@ -29,7 +29,7 @@ app.use(
 app.use(express.json({ limit: "2mb" }));
 app.use((req, res, next) => {
   const start = Date.now();
-  const requestId = crypto.randomUUID();
+  const requestId = randomUUID();
   res.setHeader("X-Request-Id", requestId);
   res.on("finish", () => {
     const duration = Date.now() - start;

@@ -52,6 +52,20 @@ export async function loginWithEmailPassword(email: string, password: string): P
   return jwt.sign(payload, env.jwtSecret, { expiresIn: env.jwtExpiresIn as jwt.SignOptions["expiresIn"] });
 }
 
+export async function registerWithEmailPassword(email: string, password: string): Promise<void> {
+  const normalizedEmail = email.toLowerCase().trim();
+  const existing = await UserModel.findOne({ email: normalizedEmail }).lean();
+  if (existing) throw new AppError("An account with this email already exists.", 409);
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  await UserModel.create({
+    email: normalizedEmail,
+    passwordHash,
+    role: "analyst",
+    isActive: true,
+  });
+}
+
 export function verifyAuthToken(token: string): AuthTokenPayload {
   if (!hasJwtConfig()) throw new AppError("JWT is not configured. Set JWT_SECRET.", 500);
   try {
