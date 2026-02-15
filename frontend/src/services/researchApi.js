@@ -20,5 +20,7 @@ export async function runIncomeStatementExtraction({ files, mode = "auto" }) {
   const blob = await response.blob();
   const extractionMode = response.headers.get("X-Extraction-Mode") || mode;
   const warning = response.headers.get("X-Extraction-Warnings") || "";
-  return { blob, extractionMode, warning };
+  const runId = response.headers.get("X-Run-Id") || "";
+  const outputUrl = response.headers.get("X-Output-Url") || "";
+  return { blob, extractionMode, warning, runId, outputUrl };
 }

@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "../config/env";
 import Button from "../components/ui/Button";
 import Panel from "../components/ui/Panel";
 import StatusPill from "../components/ui/StatusPill";
+import { runIncomeStatementExtraction } from "../services/researchApi";
 import {
   getDownloads,
   getRuns,
@@ -30,6 +31,11 @@ function ResearchPortalPage() {
   const [isSummaryLoading, setIsSummaryLoading] = useState(true);
   const [isListLoading, setIsListLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [isRunSubmitting, setIsRunSubmitting] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
+  const [refreshTick, setRefreshTick] = useState(0);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query.trim()), 250);
@@ -61,7 +67,7 @@ function ResearchPortalPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [refreshTick]);
 
   useEffect(() => {
     let isMounted = true;
@@ -106,10 +112,58 @@ function ResearchPortalPage() {
     return () => {
       isMounted = false;
     };
-  }, [debouncedQuery, downloadSort, downloadsPage, runStatus, runsPage, uploadPage, uploadSort]);
+  }, [debouncedQuery, downloadSort, downloadsPage, refreshTick, runStatus, runsPage, uploadPage, uploadSort]);
 
-  function handleAction(actionLabel) {
-    console.info(`[ResearchPortalPage] ${actionLabel}`);
+  function openFilePicker() {
+    fileInputRef.current?.click();
+  }
+
+  function handleFileSelection(event) {
+    const incomingFiles = Array.from(event.target.files || []);
+    if (!incomingFiles.length) return;
+    setSelectedFiles((current) => {
+      const existing = new Map(current.map((file) => [`${file.name}-${file.size}`, file]));
+      incomingFiles.forEach((file) => existing.set(`${file.name}-${file.size}`, file));
+      return Array.from(existing.values());
+    });
+    event.target.value = "";
+    setActionMessage(`${incomingFiles.length} file(s) added to local run batch.`);
+  }
+
+  function clearSelectedFiles() {
+    setSelectedFiles([]);
+  }
+
+  async function handleStartRun() {
+    if (!selectedFiles.length) {
+      setActionMessage("Add at least one PDF before starting a run.");
+      return;
+    }
+
+    try {
+      setIsRunSubmitting(true);
+      setActionMessage("");
+      const { blob, extractionMode, warning, runId } = await runIncomeStatementExtraction({
+        files: selectedFiles,
+        mode: "auto",
+      });
+
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = "income_statement.xlsx";
+      link.click();
+      URL.revokeObjectURL(downloadUrl);
+
+      const warningMessage = warning ? ` Warning: ${warning}` : "";
+      setActionMessage(`Run ${runId || "completed"} in ${extractionMode} mode.${warningMessage}`);
+      setSelectedFiles([]);
+      setRefreshTick((value) => value + 1);
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Failed to start extraction run.");
+    } finally {
+      setIsRunSubmitting(false);
+    }
   }
 
   return (
@@ -129,6 +183,14 @@ function ResearchPortalPage() {
             {API_BASE_URL}
           </code>
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf,.pdf"
+          multiple
+          className="hidden"
+          onChange={handleFileSelection}
+        />
       </Panel>
 
       <Panel className="grid gap-3">
@@ -187,8 +249,28 @@ function ResearchPortalPage() {
             </label>
           </div>
         </div>
+        {selectedFiles.length ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-600">
+                Local Batch ({selectedFiles.length})
+              </p>
+              <Button variant="ghost" onClick={clearSelectedFiles}>
+                Clear
+              </Button>
+            </div>
+            <ul className="grid gap-1">
+              {selectedFiles.map((file) => (
+                <li key={`${file.name}-${file.size}`} className="text-xs text-slate-700">
+                  {file.name}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {isListLoading ? <p className="text-sm text-slate-500">Refreshing list data...</p> : null}
         {loadError ? <p className="text-sm font-medium text-red-600">{loadError}</p> : null}
+        {actionMessage ? <p className="text-sm font-medium text-blue-700">{actionMessage}</p> : null}
       </Panel>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -208,7 +290,7 @@ function ResearchPortalPage() {
         <Panel as="article">
           <div className={sectionHeadClass}>
             <h3 className="text-base font-semibold text-slate-900">Upload Queue</h3>
-            <Button variant="secondary" onClick={() => handleAction("Add Statement clicked")}>
+            <Button variant="secondary" onClick={openFilePicker}>
               Add Statement
             </Button>
           </div>
@@ -289,8 +371,13 @@ function ResearchPortalPage() {
         <Panel as="article">
           <div className={sectionHeadClass}>
             <h3 className="text-base font-semibold text-slate-900">Extraction Runs</h3>
-            <Button variant="primary" onClick={() => handleAction("Start Run clicked")}>
-              Start Run
+            <Button
+              variant="primary"
+              onClick={handleStartRun}
+              disabled={isRunSubmitting}
+              className={isRunSubmitting ? "cursor-not-allowed opacity-60" : ""}
+            >
+              {isRunSubmitting ? "Running..." : "Start Run"}
             </Button>
           </div>
           <ul className="grid gap-3">
@@ -347,7 +434,7 @@ function ResearchPortalPage() {
         <Panel as="article" className="lg:col-span-2">
           <div className={sectionHeadClass}>
             <h3 className="text-base font-semibold text-slate-900">Latest Excel Exports</h3>
-            <Button variant="secondary" onClick={() => handleAction("View All exports clicked")}>
+            <Button variant="secondary" onClick={() => setDownloadsPage(1)}>
               View All
             </Button>
           </div>
