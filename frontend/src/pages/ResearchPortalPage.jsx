@@ -1,9 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { API_BASE_URL } from "../config/env";
 import Button from "../components/ui/Button";
 import Panel from "../components/ui/Panel";
 import StatusPill from "../components/ui/StatusPill";
-import { downloads, runs, summaryCards, uploadQueue } from "./data/mockResearchData";
+import {
+  getDownloads,
+  getRuns,
+  getSummary,
+  getUploadQueue,
+} from "../services/researchPortalService";
 
 function parseSizeToKb(size) {
   const [value, unit] = size.split(" ");
@@ -18,6 +23,46 @@ function ResearchPortalPage() {
   const [uploadSort, setUploadSort] = useState("company");
   const [runStatus, setRunStatus] = useState("all");
   const [downloadSort, setDownloadSort] = useState("recent");
+  const [summaryCards, setSummaryCards] = useState([]);
+  const [uploadQueue, setUploadQueue] = useState([]);
+  const [runs, setRuns] = useState([]);
+  const [downloads, setDownloads] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadPortalData() {
+      setIsLoading(true);
+      setLoadError("");
+
+      try {
+        const [summaryData, uploadData, runsData, downloadsData] = await Promise.all([
+          getSummary(),
+          getUploadQueue(),
+          getRuns(),
+          getDownloads(),
+        ]);
+
+        if (!isMounted) return;
+        setSummaryCards(summaryData);
+        setUploadQueue(uploadData);
+        setRuns(runsData);
+        setDownloads(downloadsData);
+      } catch (error) {
+        if (!isMounted) return;
+        setLoadError(error instanceof Error ? error.message : "Failed to load research portal data");
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+
+    loadPortalData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const normalizedQuery = query.trim().toLowerCase();
 
@@ -93,6 +138,7 @@ function ResearchPortalPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search company, period, run ID, or file name..."
+              disabled={isLoading}
             />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -102,6 +148,7 @@ function ResearchPortalPage() {
                 className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
                 value={uploadSort}
                 onChange={(event) => setUploadSort(event.target.value)}
+                disabled={isLoading}
               >
                 <option value="company">Company (A-Z)</option>
                 <option value="pages-desc">Pages (High to Low)</option>
@@ -115,6 +162,7 @@ function ResearchPortalPage() {
                 className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
                 value={runStatus}
                 onChange={(event) => setRunStatus(event.target.value)}
+                disabled={isLoading}
               >
                 <option value="all">All</option>
                 <option value="processing">Processing</option>
@@ -129,6 +177,7 @@ function ResearchPortalPage() {
                 className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
                 value={downloadSort}
                 onChange={(event) => setDownloadSort(event.target.value)}
+                disabled={isLoading}
               >
                 <option value="recent">Recent First</option>
                 <option value="size-desc">Largest First</option>
@@ -137,6 +186,8 @@ function ResearchPortalPage() {
             </label>
           </div>
         </div>
+        {isLoading ? <p className="text-sm text-slate-500">Loading portal data...</p> : null}
+        {loadError ? <p className="text-sm font-medium text-red-600">{loadError}</p> : null}
       </Panel>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
