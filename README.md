@@ -169,6 +169,11 @@ This version does **not** use cloud file storage.
 - File URLs are not persisted to an external storage service.
 - MongoDB stores run/job metadata for dashboard views.
 
+## Demo PDF for Testing
+
+- Sample file included at `samples/demo-income-statement.pdf`
+- Use it from the upload section to quickly validate end-to-end extraction.
+
 ## Deploy Notes
 
 - Set backend env vars in your host (Render, etc.).
@@ -178,8 +183,8 @@ This version does **not** use cloud file storage.
 
 You can add your deployed URLs below:
 
-- Frontend URL: `<add-your-url>`
-- Backend URL: `<add-your-url>`
+- Frontend URL: `https://financial-statement-extraction-to-e.vercel.app/login`
+- Backend URL: `https://financial-statement-extraction-to-excel.onrender.com`
 
 ## Quality Checks
 
