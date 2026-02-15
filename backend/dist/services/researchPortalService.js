@@ -266,6 +266,13 @@ async function getPortalRuns(options) {
         const matchesQuery = !normalizedQuery || `${run.company} ${run.id} ${run.started}`.toLowerCase().includes(normalizedQuery);
         const matchesStatus = options.status === "all" || run.status === options.status;
         return matchesQuery && matchesStatus;
+    })
+        .sort((a, b) => {
+        if (options.sort === "progress-desc")
+            return b.progressPercent - a.progressPercent;
+        if (options.sort === "progress-asc")
+            return a.progressPercent - b.progressPercent;
+        return 0;
     });
     return paginateRows(filtered, options);
 }

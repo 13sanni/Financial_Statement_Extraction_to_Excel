@@ -22,6 +22,7 @@ function ResearchPortalPage() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [uploadSort, setUploadSort] = useState("company");
   const [runStatus, setRunStatus] = useState("all");
+  const [runSort, setRunSort] = useState("recent");
   const [downloadSort, setDownloadSort] = useState("recent");
   const [summaryCards, setSummaryCards] = useState([]);
   const [uploadQueue, setUploadQueue] = useState(initialPagedData);
@@ -55,7 +56,7 @@ function ResearchPortalPage() {
     setUploadPage(1);
     setRunsPage(1);
     setDownloadsPage(1);
-  }, [debouncedQuery, uploadSort, runStatus, downloadSort]);
+  }, [debouncedQuery, uploadSort, runStatus, runSort, downloadSort]);
 
   useEffect(() => {
     let isMounted = true;
@@ -94,6 +95,7 @@ function ResearchPortalPage() {
           getRuns({
             query: debouncedQuery,
             status: runStatus,
+            sort: runSort,
             page: runsPage,
             pageSize: PAGE_SIZE,
           }),
@@ -122,7 +124,7 @@ function ResearchPortalPage() {
     return () => {
       isMounted = false;
     };
-  }, [debouncedQuery, downloadSort, downloadsPage, refreshTick, runStatus, runsPage, uploadPage, uploadSort]);
+  }, [debouncedQuery, downloadSort, downloadsPage, refreshTick, runSort, runStatus, runsPage, uploadPage, uploadSort]);
 
   useEffect(() => {
     if (queuedCount <= 0) return;
@@ -245,7 +247,7 @@ function ResearchPortalPage() {
               placeholder="Search company, period, run ID, or file name..."
             />
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
             <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
               Extraction Mode
               <select
@@ -284,6 +286,19 @@ function ResearchPortalPage() {
                 <option value="processing">Processing</option>
                 <option value="completed">Completed</option>
                 <option value="review">Needs Review</option>
+              </select>
+            </label>
+
+            <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
+              Run Sort
+              <select
+                className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
+                value={runSort}
+                onChange={(event) => setRunSort(event.target.value)}
+              >
+                <option value="recent">Recent</option>
+                <option value="progress-desc">Highest Progress</option>
+                <option value="progress-asc">Lowest Progress</option>
               </select>
             </label>
 

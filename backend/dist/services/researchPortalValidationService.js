@@ -61,6 +61,7 @@ const uploadQueueQuerySchema = paginationQuerySchema.extend({
 const runsQuerySchema = paginationQuerySchema.extend({
     query: zod_1.z.string().trim().optional().default(""),
     status: zod_1.z.enum(["all", "processing", "completed", "review"]).default("all"),
+    sort: zod_1.z.enum(["recent", "progress-desc", "progress-asc"]).default("recent"),
 });
 const downloadsQuerySchema = paginationQuerySchema.extend({
     query: zod_1.z.string().trim().optional().default(""),

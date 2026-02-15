@@ -33,9 +33,9 @@ export async function getUploadQueue({ query, sort, page, pageSize }) {
   return parseOrThrow(uploadQueueResponseSchema, response.data, "upload queue");
 }
 
-export async function getRuns({ query, status, page, pageSize }) {
+export async function getRuns({ query, status, sort, page, pageSize }) {
   const response = await portalApi.get("/portal/runs", {
-    params: { query, status, page, pageSize },
+    params: { query, status, sort, page, pageSize },
   });
   return parseOrThrow(runsResponseSchema, response.data, "runs");
 }
