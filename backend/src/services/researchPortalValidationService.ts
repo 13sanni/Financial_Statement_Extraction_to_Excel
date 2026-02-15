@@ -22,6 +22,10 @@ const runItemSchema = z.object({
   confidence: z.string().min(1),
   warning: z.string(),
   failureReason: z.string(),
+  queuedCount: z.number().int().nonnegative(),
+  processingCount: z.number().int().nonnegative(),
+  completedCount: z.number().int().nonnegative(),
+  failedCount: z.number().int().nonnegative(),
 });
 
 const downloadItemSchema = z.object({

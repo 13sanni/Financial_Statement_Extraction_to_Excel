@@ -23,6 +23,10 @@ type RunItem = {
   confidence: string;
   warning: string;
   failureReason: string;
+  queuedCount: number;
+  processingCount: number;
+  completedCount: number;
+  failedCount: number;
 };
 
 type DownloadItem = {
@@ -242,6 +246,23 @@ export async function getPortalUploadQueue(options: UploadQueueOptions): Promise
 
 export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResult<RunItem>> {
   const [runs, jobs] = await Promise.all([loadRunsFromDb(), loadJobsFromDb()]);
+  const jobsByRun = jobs.reduce((acc, job) => {
+    const list = acc.get(job.runId) || [];
+    list.push(job);
+    acc.set(job.runId, list);
+    return acc;
+  }, new Map<string, JobRecord[]>());
+
+  function countStatuses(runId: string) {
+    const items = jobsByRun.get(runId) || [];
+    return {
+      queuedCount: items.filter((job) => job.status === "queued").length,
+      processingCount: items.filter((job) => job.status === "processing").length,
+      completedCount: items.filter((job) => job.status === "completed").length,
+      failedCount: items.filter((job) => job.status === "failed").length,
+    };
+  }
+
   const failedReasonByRun = jobs
     .filter((job) => job.status === "failed" && job.errorMessage)
     .reduce((acc, job) => {
@@ -249,15 +270,22 @@ export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResu
       return acc;
     }, new Map<string, string>());
 
-  const completedRunItems: RunItem[] = runs.map((run) => ({
-    id: run.runId,
-    company: run.uploadedPdfs[0] ? humanizeFileName(run.uploadedPdfs[0].originalName) : "Unknown Company",
-    started: formatTime(run.createdAt),
-    status: run.status === "failed" ? "review" : "completed",
-    confidence: calculateRunConfidencePercent(run),
-    warning: run.warnings.join(" | "),
-    failureReason: run.status === "failed" ? failedReasonByRun.get(run.runId) || "Run failed." : "",
-  }));
+  const completedRunItems: RunItem[] = runs.map((run) => {
+    const statusCounts = countStatuses(run.runId);
+    return {
+      id: run.runId,
+      company: run.uploadedPdfs[0] ? humanizeFileName(run.uploadedPdfs[0].originalName) : "Unknown Company",
+      started: formatTime(run.createdAt),
+      status: run.status === "failed" ? "review" : "completed",
+      confidence: calculateRunConfidencePercent(run),
+      warning: run.warnings.join(" | "),
+      failureReason: run.status === "failed" ? failedReasonByRun.get(run.runId) || "Run failed." : "",
+      queuedCount: statusCounts.queuedCount,
+      processingCount: statusCounts.processingCount,
+      completedCount: statusCounts.completedCount || run.uploadedPdfs.length,
+      failedCount: statusCounts.failedCount,
+    };
+  });
   const activeJobGroups = jobs
     .filter((job) => job.status === "queued" || job.status === "processing")
     .reduce((acc, job) => {
@@ -271,6 +299,7 @@ export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResu
     const first = groupedJobs[0];
     const warningText = groupedJobs.map((job) => job.warning).filter(Boolean).join(" | ");
     const failureReason = groupedJobs.find((job) => job.errorMessage)?.errorMessage || "";
+    const statusCounts = countStatuses(runId);
     return {
       id: runId,
       company: humanizeFileName(first?.originalName || "Unknown Company"),
@@ -279,6 +308,10 @@ export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResu
       confidence: "In Progress",
       warning: warningText,
       failureReason,
+      queuedCount: statusCounts.queuedCount,
+      processingCount: statusCounts.processingCount,
+      completedCount: statusCounts.completedCount,
+      failedCount: statusCounts.failedCount,
     };
   });
 

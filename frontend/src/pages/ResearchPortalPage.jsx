@@ -428,6 +428,9 @@ function ResearchPortalPage() {
                 <div className="text-left sm:text-right">
                   <StatusPill status={run.status} />
                   <p className="mt-1 text-xs text-slate-600">Confidence {run.confidence}</p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Q:{run.queuedCount} P:{run.processingCount} C:{run.completedCount} F:{run.failedCount}
+                  </p>
                   {run.warning || run.failureReason ? (
                     <Button
                       variant="ghost"

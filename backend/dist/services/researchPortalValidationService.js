@@ -28,6 +28,10 @@ const runItemSchema = zod_1.z.object({
     confidence: zod_1.z.string().min(1),
     warning: zod_1.z.string(),
     failureReason: zod_1.z.string(),
+    queuedCount: zod_1.z.number().int().nonnegative(),
+    processingCount: zod_1.z.number().int().nonnegative(),
+    completedCount: zod_1.z.number().int().nonnegative(),
+    failedCount: zod_1.z.number().int().nonnegative(),
 });
 const downloadItemSchema = zod_1.z.object({
     id: zod_1.z.string().min(1),
