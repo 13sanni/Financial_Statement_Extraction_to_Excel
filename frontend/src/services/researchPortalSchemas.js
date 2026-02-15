@@ -19,6 +19,8 @@ const runItemSchema = z.object({
   started: z.string().min(1),
   status: z.enum(["processing", "completed", "review"]),
   confidence: z.string().min(1),
+  warning: z.string(),
+  failureReason: z.string(),
 });
 
 const downloadItemSchema = z.object({

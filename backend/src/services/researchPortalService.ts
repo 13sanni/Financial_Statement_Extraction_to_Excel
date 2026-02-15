@@ -21,6 +21,8 @@ type RunItem = {
   started: string;
   status: "processing" | "completed" | "review";
   confidence: string;
+  warning: string;
+  failureReason: string;
 };
 
 type DownloadItem = {
@@ -80,6 +82,8 @@ type JobRecord = {
   uploadedBy: string;
   years: string[];
   extractedRowCount: number;
+  warning: string;
+  errorMessage: string;
   createdAt: Date;
 };
 
@@ -166,6 +170,8 @@ async function loadJobsFromDb(): Promise<JobRecord[]> {
       uploadedBy: 1,
       years: 1,
       extractedRowCount: 1,
+      warning: 1,
+      errorMessage: 1,
       createdAt: 1,
       _id: 0,
     })
@@ -236,12 +242,21 @@ export async function getPortalUploadQueue(options: UploadQueueOptions): Promise
 
 export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResult<RunItem>> {
   const [runs, jobs] = await Promise.all([loadRunsFromDb(), loadJobsFromDb()]);
+  const failedReasonByRun = jobs
+    .filter((job) => job.status === "failed" && job.errorMessage)
+    .reduce((acc, job) => {
+      if (!acc.has(job.runId)) acc.set(job.runId, job.errorMessage);
+      return acc;
+    }, new Map<string, string>());
+
   const completedRunItems: RunItem[] = runs.map((run) => ({
     id: run.runId,
     company: run.uploadedPdfs[0] ? humanizeFileName(run.uploadedPdfs[0].originalName) : "Unknown Company",
     started: formatTime(run.createdAt),
     status: run.status === "failed" ? "review" : "completed",
     confidence: calculateRunConfidencePercent(run),
+    warning: run.warnings.join(" | "),
+    failureReason: run.status === "failed" ? failedReasonByRun.get(run.runId) || "Run failed." : "",
   }));
   const activeJobGroups = jobs
     .filter((job) => job.status === "queued" || job.status === "processing")
@@ -254,12 +269,16 @@ export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResu
 
   const activeRunItems: RunItem[] = [...activeJobGroups.entries()].map(([runId, groupedJobs]) => {
     const first = groupedJobs[0];
+    const warningText = groupedJobs.map((job) => job.warning).filter(Boolean).join(" | ");
+    const failureReason = groupedJobs.find((job) => job.errorMessage)?.errorMessage || "";
     return {
       id: runId,
       company: humanizeFileName(first?.originalName || "Unknown Company"),
       started: formatTime(first?.createdAt || new Date()),
       status: "processing",
       confidence: "In Progress",
+      warning: warningText,
+      failureReason,
     };
   });
 

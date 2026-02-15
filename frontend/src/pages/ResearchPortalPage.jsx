@@ -38,6 +38,7 @@ function ResearchPortalPage() {
   const [refreshTick, setRefreshTick] = useState(0);
   const [extractionMode, setExtractionMode] = useState("auto");
   const [lastSyncedAt, setLastSyncedAt] = useState("");
+  const [expandedRunId, setExpandedRunId] = useState("");
   const fileInputRef = useRef(null);
   const queuedCard = summaryCards.find((card) => card.label === "Queued for Extraction");
   const queuedCount = Number.parseInt(queuedCard?.value || "0", 10) || 0;
@@ -427,7 +428,30 @@ function ResearchPortalPage() {
                 <div className="text-left sm:text-right">
                   <StatusPill status={run.status} />
                   <p className="mt-1 text-xs text-slate-600">Confidence {run.confidence}</p>
+                  {run.warning || run.failureReason ? (
+                    <Button
+                      variant="ghost"
+                      className="mt-2"
+                      onClick={() => setExpandedRunId((current) => (current === run.id ? "" : run.id))}
+                    >
+                      {expandedRunId === run.id ? "Hide Details" : "View Details"}
+                    </Button>
+                  ) : null}
                 </div>
+                {expandedRunId === run.id && (run.warning || run.failureReason) ? (
+                  <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    {run.warning ? (
+                      <p className="text-xs text-amber-700">
+                        <span className="font-semibold">Warning:</span> {run.warning}
+                      </p>
+                    ) : null}
+                    {run.failureReason ? (
+                      <p className="mt-2 text-xs text-red-700">
+                        <span className="font-semibold">Failure:</span> {run.failureReason}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
               </li>
             ))}
             {!isListLoading && runs.items.length === 0 ? (

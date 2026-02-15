@@ -26,6 +26,8 @@ const runItemSchema = zod_1.z.object({
     started: zod_1.z.string().min(1),
     status: zod_1.z.enum(["processing", "completed", "review"]),
     confidence: zod_1.z.string().min(1),
+    warning: zod_1.z.string(),
+    failureReason: zod_1.z.string(),
 });
 const downloadItemSchema = zod_1.z.object({
     id: zod_1.z.string().min(1),

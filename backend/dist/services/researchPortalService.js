@@ -87,6 +87,8 @@ async function loadJobsFromDb() {
         uploadedBy: 1,
         years: 1,
         extractedRowCount: 1,
+        warning: 1,
+        errorMessage: 1,
         createdAt: 1,
         _id: 0,
     })
@@ -154,12 +156,21 @@ async function getPortalUploadQueue(options) {
 }
 async function getPortalRuns(options) {
     const [runs, jobs] = await Promise.all([loadRunsFromDb(), loadJobsFromDb()]);
+    const failedReasonByRun = jobs
+        .filter((job) => job.status === "failed" && job.errorMessage)
+        .reduce((acc, job) => {
+        if (!acc.has(job.runId))
+            acc.set(job.runId, job.errorMessage);
+        return acc;
+    }, new Map());
     const completedRunItems = runs.map((run) => ({
         id: run.runId,
         company: run.uploadedPdfs[0] ? humanizeFileName(run.uploadedPdfs[0].originalName) : "Unknown Company",
         started: formatTime(run.createdAt),
         status: run.status === "failed" ? "review" : "completed",
         confidence: calculateRunConfidencePercent(run),
+        warning: run.warnings.join(" | "),
+        failureReason: run.status === "failed" ? failedReasonByRun.get(run.runId) || "Run failed." : "",
     }));
     const activeJobGroups = jobs
         .filter((job) => job.status === "queued" || job.status === "processing")
@@ -171,12 +182,16 @@ async function getPortalRuns(options) {
     }, new Map());
     const activeRunItems = [...activeJobGroups.entries()].map(([runId, groupedJobs]) => {
         const first = groupedJobs[0];
+        const warningText = groupedJobs.map((job) => job.warning).filter(Boolean).join(" | ");
+        const failureReason = groupedJobs.find((job) => job.errorMessage)?.errorMessage || "";
         return {
             id: runId,
             company: humanizeFileName(first?.originalName || "Unknown Company"),
             started: formatTime(first?.createdAt || new Date()),
             status: "processing",
             confidence: "In Progress",
+            warning: warningText,
+            failureReason,
         };
     });
     const runItems = [...activeRunItems, ...completedRunItems];
