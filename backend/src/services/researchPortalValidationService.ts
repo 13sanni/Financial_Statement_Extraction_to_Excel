@@ -26,6 +26,7 @@ const runItemSchema = z.object({
   processingCount: z.number().int().nonnegative(),
   completedCount: z.number().int().nonnegative(),
   failedCount: z.number().int().nonnegative(),
+  progressPercent: z.number().int().min(0).max(100),
 });
 
 const downloadItemSchema = z.object({

@@ -190,6 +190,16 @@ async function getPortalRuns(options) {
             failedCount: items.filter((job) => job.status === "failed").length,
         };
     }
+    function calculateProgressPercent(statusCounts) {
+        const total = statusCounts.queuedCount +
+            statusCounts.processingCount +
+            statusCounts.completedCount +
+            statusCounts.failedCount;
+        if (!total)
+            return 0;
+        const done = statusCounts.completedCount + statusCounts.failedCount;
+        return Math.min(100, Math.max(0, Math.round((done / total) * 100)));
+    }
     const failedReasonByRun = jobs
         .filter((job) => job.status === "failed" && job.errorMessage)
         .reduce((acc, job) => {
@@ -211,6 +221,15 @@ async function getPortalRuns(options) {
             processingCount: statusCounts.processingCount,
             completedCount: statusCounts.completedCount || run.uploadedPdfs.length,
             failedCount: statusCounts.failedCount,
+            progressPercent: statusCounts.completedCount ||
+                statusCounts.failedCount ||
+                statusCounts.processingCount ||
+                statusCounts.queuedCount
+                ? calculateProgressPercent({
+                    ...statusCounts,
+                    completedCount: statusCounts.completedCount || run.uploadedPdfs.length,
+                })
+                : 100,
         };
     });
     const activeJobGroups = jobs
@@ -238,6 +257,7 @@ async function getPortalRuns(options) {
             processingCount: statusCounts.processingCount,
             completedCount: statusCounts.completedCount,
             failedCount: statusCounts.failedCount,
+            progressPercent: calculateProgressPercent(statusCounts),
         };
     });
     const runItems = [...activeRunItems, ...completedRunItems];

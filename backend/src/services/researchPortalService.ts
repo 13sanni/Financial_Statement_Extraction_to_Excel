@@ -27,6 +27,7 @@ type RunItem = {
   processingCount: number;
   completedCount: number;
   failedCount: number;
+  progressPercent: number;
 };
 
 type DownloadItem = {
@@ -296,6 +297,22 @@ export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResu
     };
   }
 
+  function calculateProgressPercent(statusCounts: {
+    queuedCount: number;
+    processingCount: number;
+    completedCount: number;
+    failedCount: number;
+  }): number {
+    const total =
+      statusCounts.queuedCount +
+      statusCounts.processingCount +
+      statusCounts.completedCount +
+      statusCounts.failedCount;
+    if (!total) return 0;
+    const done = statusCounts.completedCount + statusCounts.failedCount;
+    return Math.min(100, Math.max(0, Math.round((done / total) * 100)));
+  }
+
   const failedReasonByRun = jobs
     .filter((job) => job.status === "failed" && job.errorMessage)
     .reduce((acc, job) => {
@@ -317,6 +334,16 @@ export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResu
       processingCount: statusCounts.processingCount,
       completedCount: statusCounts.completedCount || run.uploadedPdfs.length,
       failedCount: statusCounts.failedCount,
+      progressPercent:
+        statusCounts.completedCount ||
+        statusCounts.failedCount ||
+        statusCounts.processingCount ||
+        statusCounts.queuedCount
+          ? calculateProgressPercent({
+              ...statusCounts,
+              completedCount: statusCounts.completedCount || run.uploadedPdfs.length,
+            })
+          : 100,
     };
   });
   const activeJobGroups = jobs
@@ -345,6 +372,7 @@ export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResu
       processingCount: statusCounts.processingCount,
       completedCount: statusCounts.completedCount,
       failedCount: statusCounts.failedCount,
+      progressPercent: calculateProgressPercent(statusCounts),
     };
   });
 

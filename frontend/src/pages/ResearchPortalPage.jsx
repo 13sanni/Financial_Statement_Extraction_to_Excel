@@ -454,6 +454,21 @@ function ResearchPortalPage() {
                   <p className="mt-1 text-xs text-slate-600">
                     Q:{run.queuedCount} P:{run.processingCount} C:{run.completedCount} F:{run.failedCount}
                   </p>
+                  <div className="mt-2 w-full sm:w-44">
+                    <div className="h-1.5 w-full rounded-full bg-slate-200">
+                      <div
+                        className={`h-1.5 rounded-full ${
+                          run.status === "review"
+                            ? "bg-amber-500"
+                            : run.status === "completed"
+                              ? "bg-emerald-500"
+                              : "bg-blue-500"
+                        }`}
+                        style={{ width: `${run.progressPercent}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-[11px] text-slate-500">{run.progressPercent}% complete</p>
+                  </div>
                   <Button
                     variant="ghost"
                     className="mt-2"

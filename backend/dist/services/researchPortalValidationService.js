@@ -34,6 +34,7 @@ const runItemSchema = zod_1.z.object({
     processingCount: zod_1.z.number().int().nonnegative(),
     completedCount: zod_1.z.number().int().nonnegative(),
     failedCount: zod_1.z.number().int().nonnegative(),
+    progressPercent: zod_1.z.number().int().min(0).max(100),
 });
 const downloadItemSchema = zod_1.z.object({
     id: zod_1.z.string().min(1),
