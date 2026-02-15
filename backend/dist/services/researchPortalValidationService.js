@@ -35,6 +35,7 @@ const runItemSchema = zod_1.z.object({
     completedCount: zod_1.z.number().int().nonnegative(),
     failedCount: zod_1.z.number().int().nonnegative(),
     progressPercent: zod_1.z.number().int().min(0).max(100),
+    outputExcelUrl: zod_1.z.string(),
 });
 const downloadItemSchema = zod_1.z.object({
     id: zod_1.z.string().min(1),

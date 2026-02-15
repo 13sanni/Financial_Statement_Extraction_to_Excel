@@ -230,6 +230,7 @@ async function getPortalRuns(options) {
                     completedCount: statusCounts.completedCount || run.uploadedPdfs.length,
                 })
                 : 100,
+            outputExcelUrl: run.outputExcel?.cloudinaryUrl || "",
         };
     });
     const activeJobGroups = jobs
@@ -258,6 +259,7 @@ async function getPortalRuns(options) {
             completedCount: statusCounts.completedCount,
             failedCount: statusCounts.failedCount,
             progressPercent: calculateProgressPercent(statusCounts),
+            outputExcelUrl: "",
         };
     });
     const runItems = [...activeRunItems, ...completedRunItems];

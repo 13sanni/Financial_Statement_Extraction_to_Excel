@@ -28,6 +28,7 @@ type RunItem = {
   completedCount: number;
   failedCount: number;
   progressPercent: number;
+  outputExcelUrl: string;
 };
 
 type DownloadItem = {
@@ -345,6 +346,7 @@ export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResu
               completedCount: statusCounts.completedCount || run.uploadedPdfs.length,
             })
           : 100,
+      outputExcelUrl: run.outputExcel?.cloudinaryUrl || "",
     };
   });
   const activeJobGroups = jobs
@@ -374,6 +376,7 @@ export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResu
       completedCount: statusCounts.completedCount,
       failedCount: statusCounts.failedCount,
       progressPercent: calculateProgressPercent(statusCounts),
+      outputExcelUrl: "",
     };
   });
 

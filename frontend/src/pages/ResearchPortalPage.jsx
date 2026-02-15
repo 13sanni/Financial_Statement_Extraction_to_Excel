@@ -491,6 +491,15 @@ function ResearchPortalPage() {
                   >
                     {expandedRunId === run.id ? "Hide Details" : "View Details"}
                   </Button>
+                  {run.outputExcelUrl ? (
+                    <Button
+                      variant="ghost"
+                      className="mt-2"
+                      onClick={() => window.open(run.outputExcelUrl, "_blank", "noopener,noreferrer")}
+                    >
+                      Open Output
+                    </Button>
+                  ) : null}
                 </div>
                 {expandedRunId === run.id ? (
                   <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3">

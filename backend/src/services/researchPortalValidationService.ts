@@ -27,6 +27,7 @@ const runItemSchema = z.object({
   completedCount: z.number().int().nonnegative(),
   failedCount: z.number().int().nonnegative(),
   progressPercent: z.number().int().min(0).max(100),
+  outputExcelUrl: z.string(),
 });
 
 const downloadItemSchema = z.object({
