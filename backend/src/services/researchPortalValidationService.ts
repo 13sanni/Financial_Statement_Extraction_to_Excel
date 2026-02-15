@@ -28,6 +28,35 @@ const downloadItemSchema = z.object({
   size: z.string().min(1),
 });
 
+const paginatedResponseSchema = <T extends z.ZodTypeAny>(itemSchema: T) =>
+  z.object({
+    items: z.array(itemSchema),
+    page: z.number().int().min(1),
+    pageSize: z.number().int().min(1),
+    totalItems: z.number().int().min(0),
+    totalPages: z.number().int().min(1),
+  });
+
+const paginationQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(5),
+});
+
+const uploadQueueQuerySchema = paginationQuerySchema.extend({
+  query: z.string().trim().optional().default(""),
+  sort: z.enum(["company", "pages-desc", "pages-asc"]).default("company"),
+});
+
+const runsQuerySchema = paginationQuerySchema.extend({
+  query: z.string().trim().optional().default(""),
+  status: z.enum(["all", "processing", "completed", "review"]).default("all"),
+});
+
+const downloadsQuerySchema = paginationQuerySchema.extend({
+  query: z.string().trim().optional().default(""),
+  sort: z.enum(["recent", "size-desc", "size-asc"]).default("recent"),
+});
+
 function parseOrThrow<T>(schema: z.ZodType<T>, data: unknown, label: string): T {
   const parsed = schema.safeParse(data);
   if (!parsed.success) {
@@ -42,13 +71,25 @@ export function validatePortalSummary(data: unknown) {
 }
 
 export function validatePortalUploadQueue(data: unknown) {
-  return parseOrThrow(z.array(uploadQueueItemSchema), data, "upload queue");
+  return parseOrThrow(paginatedResponseSchema(uploadQueueItemSchema), data, "upload queue");
 }
 
 export function validatePortalRuns(data: unknown) {
-  return parseOrThrow(z.array(runItemSchema), data, "runs");
+  return parseOrThrow(paginatedResponseSchema(runItemSchema), data, "runs");
 }
 
 export function validatePortalDownloads(data: unknown) {
-  return parseOrThrow(z.array(downloadItemSchema), data, "downloads");
+  return parseOrThrow(paginatedResponseSchema(downloadItemSchema), data, "downloads");
+}
+
+export function validatePortalUploadQueueQuery(data: unknown) {
+  return parseOrThrow(uploadQueueQuerySchema, data, "upload queue query");
+}
+
+export function validatePortalRunsQuery(data: unknown) {
+  return parseOrThrow(runsQuerySchema, data, "runs query");
+}
+
+export function validatePortalDownloadsQuery(data: unknown) {
+  return parseOrThrow(downloadsQuerySchema, data, "downloads query");
 }

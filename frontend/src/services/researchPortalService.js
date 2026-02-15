@@ -25,17 +25,23 @@ export async function getSummary() {
   return parseOrThrow(summaryResponseSchema, response.data, "summary");
 }
 
-export async function getUploadQueue() {
-  const response = await portalApi.get("/portal/upload-queue");
+export async function getUploadQueue({ query, sort, page, pageSize }) {
+  const response = await portalApi.get("/portal/upload-queue", {
+    params: { query, sort, page, pageSize },
+  });
   return parseOrThrow(uploadQueueResponseSchema, response.data, "upload queue");
 }
 
-export async function getRuns() {
-  const response = await portalApi.get("/portal/runs");
+export async function getRuns({ query, status, page, pageSize }) {
+  const response = await portalApi.get("/portal/runs", {
+    params: { query, status, page, pageSize },
+  });
   return parseOrThrow(runsResponseSchema, response.data, "runs");
 }
 
-export async function getDownloads() {
-  const response = await portalApi.get("/portal/downloads");
+export async function getDownloads({ query, sort, page, pageSize }) {
+  const response = await portalApi.get("/portal/downloads", {
+    params: { query, sort, page, pageSize },
+  });
   return parseOrThrow(downloadsResponseSchema, response.data, "downloads");
 }

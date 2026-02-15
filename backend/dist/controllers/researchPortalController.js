@@ -9,12 +9,15 @@ const researchPortalValidationService_1 = require("../services/researchPortalVal
 function getSummary(_req, res) {
     res.json((0, researchPortalValidationService_1.validatePortalSummary)((0, researchPortalService_1.getPortalSummary)()));
 }
-function getUploadQueue(_req, res) {
-    res.json((0, researchPortalValidationService_1.validatePortalUploadQueue)((0, researchPortalService_1.getPortalUploadQueue)()));
+function getUploadQueue(req, res) {
+    const query = (0, researchPortalValidationService_1.validatePortalUploadQueueQuery)(req.query);
+    res.json((0, researchPortalValidationService_1.validatePortalUploadQueue)((0, researchPortalService_1.getPortalUploadQueue)(query)));
 }
-function getRuns(_req, res) {
-    res.json((0, researchPortalValidationService_1.validatePortalRuns)((0, researchPortalService_1.getPortalRuns)()));
+function getRuns(req, res) {
+    const query = (0, researchPortalValidationService_1.validatePortalRunsQuery)(req.query);
+    res.json((0, researchPortalValidationService_1.validatePortalRuns)((0, researchPortalService_1.getPortalRuns)(query)));
 }
-function getDownloads(_req, res) {
-    res.json((0, researchPortalValidationService_1.validatePortalDownloads)((0, researchPortalService_1.getPortalDownloads)()));
+function getDownloads(req, res) {
+    const query = (0, researchPortalValidationService_1.validatePortalDownloadsQuery)(req.query);
+    res.json((0, researchPortalValidationService_1.validatePortalDownloads)((0, researchPortalService_1.getPortalDownloads)(query)));
 }

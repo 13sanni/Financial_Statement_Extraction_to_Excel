@@ -27,7 +27,16 @@ const downloadItemSchema = z.object({
   size: z.string().min(1),
 });
 
+const paginatedResponseSchema = (itemSchema) =>
+  z.object({
+    items: z.array(itemSchema),
+    page: z.number().int().min(1),
+    pageSize: z.number().int().min(1),
+    totalItems: z.number().int().min(0),
+    totalPages: z.number().int().min(1),
+  });
+
 export const summaryResponseSchema = z.array(summaryCardSchema);
-export const uploadQueueResponseSchema = z.array(uploadQueueItemSchema);
-export const runsResponseSchema = z.array(runItemSchema);
-export const downloadsResponseSchema = z.array(downloadItemSchema);
+export const uploadQueueResponseSchema = paginatedResponseSchema(uploadQueueItemSchema);
+export const runsResponseSchema = paginatedResponseSchema(runItemSchema);
+export const downloadsResponseSchema = paginatedResponseSchema(downloadItemSchema);

@@ -4,6 +4,9 @@ exports.validatePortalSummary = validatePortalSummary;
 exports.validatePortalUploadQueue = validatePortalUploadQueue;
 exports.validatePortalRuns = validatePortalRuns;
 exports.validatePortalDownloads = validatePortalDownloads;
+exports.validatePortalUploadQueueQuery = validatePortalUploadQueueQuery;
+exports.validatePortalRunsQuery = validatePortalRunsQuery;
+exports.validatePortalDownloadsQuery = validatePortalDownloadsQuery;
 const zod_1 = require("zod");
 const appError_1 = require("../utils/appError");
 const summaryCardSchema = zod_1.z.object({
@@ -29,6 +32,29 @@ const downloadItemSchema = zod_1.z.object({
     generatedAt: zod_1.z.string().min(1),
     size: zod_1.z.string().min(1),
 });
+const paginatedResponseSchema = (itemSchema) => zod_1.z.object({
+    items: zod_1.z.array(itemSchema),
+    page: zod_1.z.number().int().min(1),
+    pageSize: zod_1.z.number().int().min(1),
+    totalItems: zod_1.z.number().int().min(0),
+    totalPages: zod_1.z.number().int().min(1),
+});
+const paginationQuerySchema = zod_1.z.object({
+    page: zod_1.z.coerce.number().int().min(1).default(1),
+    pageSize: zod_1.z.coerce.number().int().min(1).max(50).default(5),
+});
+const uploadQueueQuerySchema = paginationQuerySchema.extend({
+    query: zod_1.z.string().trim().optional().default(""),
+    sort: zod_1.z.enum(["company", "pages-desc", "pages-asc"]).default("company"),
+});
+const runsQuerySchema = paginationQuerySchema.extend({
+    query: zod_1.z.string().trim().optional().default(""),
+    status: zod_1.z.enum(["all", "processing", "completed", "review"]).default("all"),
+});
+const downloadsQuerySchema = paginationQuerySchema.extend({
+    query: zod_1.z.string().trim().optional().default(""),
+    sort: zod_1.z.enum(["recent", "size-desc", "size-asc"]).default("recent"),
+});
 function parseOrThrow(schema, data, label) {
     const parsed = schema.safeParse(data);
     if (!parsed.success) {
@@ -41,11 +67,20 @@ function validatePortalSummary(data) {
     return parseOrThrow(zod_1.z.array(summaryCardSchema), data, "summary");
 }
 function validatePortalUploadQueue(data) {
-    return parseOrThrow(zod_1.z.array(uploadQueueItemSchema), data, "upload queue");
+    return parseOrThrow(paginatedResponseSchema(uploadQueueItemSchema), data, "upload queue");
 }
 function validatePortalRuns(data) {
-    return parseOrThrow(zod_1.z.array(runItemSchema), data, "runs");
+    return parseOrThrow(paginatedResponseSchema(runItemSchema), data, "runs");
 }
 function validatePortalDownloads(data) {
-    return parseOrThrow(zod_1.z.array(downloadItemSchema), data, "downloads");
+    return parseOrThrow(paginatedResponseSchema(downloadItemSchema), data, "downloads");
+}
+function validatePortalUploadQueueQuery(data) {
+    return parseOrThrow(uploadQueueQuerySchema, data, "upload queue query");
+}
+function validatePortalRunsQuery(data) {
+    return parseOrThrow(runsQuerySchema, data, "runs query");
+}
+function validatePortalDownloadsQuery(data) {
+    return parseOrThrow(downloadsQuerySchema, data, "downloads query");
 }

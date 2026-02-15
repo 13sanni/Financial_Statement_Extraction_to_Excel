@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { API_BASE_URL } from "../config/env";
 import Button from "../components/ui/Button";
 import Panel from "../components/ui/Panel";
@@ -10,43 +10,87 @@ import {
   getUploadQueue,
 } from "../services/researchPortalService";
 
-function parseSizeToKb(size) {
-  const [value, unit] = size.split(" ");
-  const numeric = Number.parseFloat(value);
-  if (unit === "MB") return Math.round(numeric * 1024);
-  return Math.round(numeric);
-}
+const PAGE_SIZE = 2;
+const initialPagedData = { items: [], page: 1, pageSize: PAGE_SIZE, totalItems: 0, totalPages: 1 };
 
 function ResearchPortalPage() {
   const sectionHeadClass = "mb-3 flex items-center justify-between gap-3";
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [uploadSort, setUploadSort] = useState("company");
   const [runStatus, setRunStatus] = useState("all");
   const [downloadSort, setDownloadSort] = useState("recent");
   const [summaryCards, setSummaryCards] = useState([]);
-  const [uploadQueue, setUploadQueue] = useState([]);
-  const [runs, setRuns] = useState([]);
-  const [downloads, setDownloads] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [uploadQueue, setUploadQueue] = useState(initialPagedData);
+  const [runs, setRuns] = useState(initialPagedData);
+  const [downloads, setDownloads] = useState(initialPagedData);
+  const [uploadPage, setUploadPage] = useState(1);
+  const [runsPage, setRunsPage] = useState(1);
+  const [downloadsPage, setDownloadsPage] = useState(1);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(true);
+  const [isListLoading, setIsListLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    setUploadPage(1);
+    setRunsPage(1);
+    setDownloadsPage(1);
+  }, [debouncedQuery, uploadSort, runStatus, downloadSort]);
+
+  useEffect(() => {
     let isMounted = true;
-
-    async function loadPortalData() {
-      setIsLoading(true);
-      setLoadError("");
-
+    async function loadSummary() {
+      setIsSummaryLoading(true);
       try {
-        const [summaryData, uploadData, runsData, downloadsData] = await Promise.all([
-          getSummary(),
-          getUploadQueue(),
-          getRuns(),
-          getDownloads(),
+        const summaryData = await getSummary();
+        if (!isMounted) return;
+        setSummaryCards(summaryData);
+      } catch (error) {
+        if (!isMounted) return;
+        setLoadError(error instanceof Error ? error.message : "Failed to load portal summary");
+      } finally {
+        if (isMounted) setIsSummaryLoading(false);
+      }
+    }
+    loadSummary();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadLists() {
+      setIsListLoading(true);
+      setLoadError("");
+      try {
+        const [uploadData, runsData, downloadsData] = await Promise.all([
+          getUploadQueue({
+            query: debouncedQuery,
+            sort: uploadSort,
+            page: uploadPage,
+            pageSize: PAGE_SIZE,
+          }),
+          getRuns({
+            query: debouncedQuery,
+            status: runStatus,
+            page: runsPage,
+            pageSize: PAGE_SIZE,
+          }),
+          getDownloads({
+            query: debouncedQuery,
+            sort: downloadSort,
+            page: downloadsPage,
+            pageSize: PAGE_SIZE,
+          }),
         ]);
 
         if (!isMounted) return;
-        setSummaryCards(summaryData);
         setUploadQueue(uploadData);
         setRuns(runsData);
         setDownloads(downloadsData);
@@ -54,54 +98,15 @@ function ResearchPortalPage() {
         if (!isMounted) return;
         setLoadError(error instanceof Error ? error.message : "Failed to load research portal data");
       } finally {
-        if (isMounted) setIsLoading(false);
+        if (isMounted) setIsListLoading(false);
       }
     }
 
-    loadPortalData();
+    loadLists();
     return () => {
       isMounted = false;
     };
-  }, []);
-
-  const normalizedQuery = query.trim().toLowerCase();
-
-  const filteredUploadQueue = useMemo(() => {
-    const filtered = uploadQueue.filter((item) => {
-      if (!normalizedQuery) return true;
-      const searchable = `${item.company} ${item.period} ${item.uploadedBy}`.toLowerCase();
-      return searchable.includes(normalizedQuery);
-    });
-
-    return filtered.sort((a, b) => {
-      if (uploadSort === "pages-desc") return b.pages - a.pages;
-      if (uploadSort === "pages-asc") return a.pages - b.pages;
-      return a.company.localeCompare(b.company);
-    });
-  }, [normalizedQuery, uploadSort]);
-
-  const filteredRuns = useMemo(() => {
-    return runs.filter((run) => {
-      const matchesQuery =
-        !normalizedQuery ||
-        `${run.company} ${run.id} ${run.started}`.toLowerCase().includes(normalizedQuery);
-      const matchesStatus = runStatus === "all" || run.status === runStatus;
-      return matchesQuery && matchesStatus;
-    });
-  }, [normalizedQuery, runStatus]);
-
-  const filteredDownloads = useMemo(() => {
-    const filtered = downloads.filter((download) => {
-      if (!normalizedQuery) return true;
-      return download.file.toLowerCase().includes(normalizedQuery);
-    });
-
-    return filtered.sort((a, b) => {
-      if (downloadSort === "size-desc") return parseSizeToKb(b.size) - parseSizeToKb(a.size);
-      if (downloadSort === "size-asc") return parseSizeToKb(a.size) - parseSizeToKb(b.size);
-      return b.generatedAt.localeCompare(a.generatedAt);
-    });
-  }, [downloadSort, normalizedQuery]);
+  }, [debouncedQuery, downloadSort, downloadsPage, runStatus, runsPage, uploadPage, uploadSort]);
 
   function handleAction(actionLabel) {
     console.info(`[ResearchPortalPage] ${actionLabel}`);
@@ -138,7 +143,6 @@ function ResearchPortalPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search company, period, run ID, or file name..."
-              disabled={isLoading}
             />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -148,7 +152,6 @@ function ResearchPortalPage() {
                 className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
                 value={uploadSort}
                 onChange={(event) => setUploadSort(event.target.value)}
-                disabled={isLoading}
               >
                 <option value="company">Company (A-Z)</option>
                 <option value="pages-desc">Pages (High to Low)</option>
@@ -162,7 +165,6 @@ function ResearchPortalPage() {
                 className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
                 value={runStatus}
                 onChange={(event) => setRunStatus(event.target.value)}
-                disabled={isLoading}
               >
                 <option value="all">All</option>
                 <option value="processing">Processing</option>
@@ -177,7 +179,6 @@ function ResearchPortalPage() {
                 className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
                 value={downloadSort}
                 onChange={(event) => setDownloadSort(event.target.value)}
-                disabled={isLoading}
               >
                 <option value="recent">Recent First</option>
                 <option value="size-desc">Largest First</option>
@@ -186,11 +187,14 @@ function ResearchPortalPage() {
             </label>
           </div>
         </div>
-        {isLoading ? <p className="text-sm text-slate-500">Loading portal data...</p> : null}
+        {isListLoading ? <p className="text-sm text-slate-500">Refreshing list data...</p> : null}
         {loadError ? <p className="text-sm font-medium text-red-600">{loadError}</p> : null}
       </Panel>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {isSummaryLoading ? (
+          <p className="text-sm text-slate-500">Loading summary...</p>
+        ) : null}
         {summaryCards.map((card) => (
           <Panel key={card.label} as="article">
             <p className="text-xs uppercase tracking-[0.04em] text-slate-500">{card.label}</p>
@@ -227,7 +231,7 @@ function ResearchPortalPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredUploadQueue.map((item) => (
+                {uploadQueue.items.map((item) => (
                   <tr key={`${item.company}-${item.period}`}>
                     <td className="whitespace-nowrap border-b border-slate-100 px-1.5 py-2 text-sm text-slate-900">
                       {item.company}
@@ -243,7 +247,7 @@ function ResearchPortalPage() {
                     </td>
                   </tr>
                 ))}
-                {filteredUploadQueue.length === 0 ? (
+                {!isListLoading && uploadQueue.items.length === 0 ? (
                   <tr>
                     <td className="px-1.5 py-3 text-sm text-slate-500" colSpan={4}>
                       No upload rows match your current filters.
@@ -252,6 +256,33 @@ function ResearchPortalPage() {
                 ) : null}
               </tbody>
             </table>
+          </div>
+          <div className="mt-3 flex items-center justify-between">
+            <p className="text-xs text-slate-500">
+              Page {uploadQueue.page} of {uploadQueue.totalPages} ({uploadQueue.totalItems} total)
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setUploadPage((current) => Math.max(1, current - 1))}
+                disabled={uploadQueue.page <= 1 || isListLoading}
+                className={uploadQueue.page <= 1 || isListLoading ? "cursor-not-allowed opacity-50" : ""}
+              >
+                Prev
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setUploadPage((current) => Math.min(uploadQueue.totalPages, current + 1))}
+                disabled={uploadQueue.page >= uploadQueue.totalPages || isListLoading}
+                className={
+                  uploadQueue.page >= uploadQueue.totalPages || isListLoading
+                    ? "cursor-not-allowed opacity-50"
+                    : ""
+                }
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </Panel>
 
@@ -263,7 +294,7 @@ function ResearchPortalPage() {
             </Button>
           </div>
           <ul className="grid gap-3">
-            {filteredRuns.map((run) => (
+            {runs.items.map((run) => (
               <li
                 key={run.id}
                 className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between"
@@ -280,12 +311,37 @@ function ResearchPortalPage() {
                 </div>
               </li>
             ))}
-            {filteredRuns.length === 0 ? (
+            {!isListLoading && runs.items.length === 0 ? (
               <li className="rounded-xl border border-dashed border-slate-300 p-3 text-sm text-slate-500">
                 No extraction runs match your current filters.
               </li>
             ) : null}
           </ul>
+          <div className="mt-3 flex items-center justify-between">
+            <p className="text-xs text-slate-500">
+              Page {runs.page} of {runs.totalPages} ({runs.totalItems} total)
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setRunsPage((current) => Math.max(1, current - 1))}
+                disabled={runs.page <= 1 || isListLoading}
+                className={runs.page <= 1 || isListLoading ? "cursor-not-allowed opacity-50" : ""}
+              >
+                Prev
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setRunsPage((current) => Math.min(runs.totalPages, current + 1))}
+                disabled={runs.page >= runs.totalPages || isListLoading}
+                className={
+                  runs.page >= runs.totalPages || isListLoading ? "cursor-not-allowed opacity-50" : ""
+                }
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </Panel>
 
         <Panel as="article" className="lg:col-span-2">
@@ -296,7 +352,7 @@ function ResearchPortalPage() {
             </Button>
           </div>
           <ul className="grid gap-3">
-            {filteredDownloads.map((download) => (
+            {downloads.items.map((download) => (
               <li
                 key={download.file}
                 className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between"
@@ -316,12 +372,41 @@ function ResearchPortalPage() {
                 </div>
               </li>
             ))}
-            {filteredDownloads.length === 0 ? (
+            {!isListLoading && downloads.items.length === 0 ? (
               <li className="rounded-xl border border-dashed border-slate-300 p-3 text-sm text-slate-500">
                 No exports match your current filters.
               </li>
             ) : null}
           </ul>
+          <div className="mt-3 flex items-center justify-between">
+            <p className="text-xs text-slate-500">
+              Page {downloads.page} of {downloads.totalPages} ({downloads.totalItems} total)
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setDownloadsPage((current) => Math.max(1, current - 1))}
+                disabled={downloads.page <= 1 || isListLoading}
+                className={downloads.page <= 1 || isListLoading ? "cursor-not-allowed opacity-50" : ""}
+              >
+                Prev
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() =>
+                  setDownloadsPage((current) => Math.min(downloads.totalPages, current + 1))
+                }
+                disabled={downloads.page >= downloads.totalPages || isListLoading}
+                className={
+                  downloads.page >= downloads.totalPages || isListLoading
+                    ? "cursor-not-allowed opacity-50"
+                    : ""
+                }
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </Panel>
       </section>
     </div>

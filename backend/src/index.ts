@@ -1,5 +1,6 @@
 import cors from "cors";
 import express from "express";
+import { connectDatabase } from "./config/database";
 import toolRoutes from "./routes/toolRoutes";
 import { AppError } from "./utils/appError";
 
@@ -22,6 +23,15 @@ app.use(
 );
 
 const port = process.env.PORT ? Number(process.env.PORT) : 4000;
-app.listen(port, () => {
-  console.log(`API listening on http://localhost:${port}`);
+
+async function startServer() {
+  await connectDatabase();
+  app.listen(port, () => {
+    console.log(`API listening on http://localhost:${port}`);
+  });
+}
+
+startServer().catch((error) => {
+  console.error("Failed to start server", error);
+  process.exit(1);
 });

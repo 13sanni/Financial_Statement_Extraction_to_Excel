@@ -7,23 +7,29 @@ import {
 } from "../services/researchPortalService";
 import {
   validatePortalDownloads,
+  validatePortalDownloadsQuery,
   validatePortalRuns,
+  validatePortalRunsQuery,
   validatePortalSummary,
   validatePortalUploadQueue,
+  validatePortalUploadQueueQuery,
 } from "../services/researchPortalValidationService";
 
 export function getSummary(_req: Request, res: Response) {
   res.json(validatePortalSummary(getPortalSummary()));
 }
 
-export function getUploadQueue(_req: Request, res: Response) {
-  res.json(validatePortalUploadQueue(getPortalUploadQueue()));
+export function getUploadQueue(req: Request, res: Response) {
+  const query = validatePortalUploadQueueQuery(req.query);
+  res.json(validatePortalUploadQueue(getPortalUploadQueue(query)));
 }
 
-export function getRuns(_req: Request, res: Response) {
-  res.json(validatePortalRuns(getPortalRuns()));
+export function getRuns(req: Request, res: Response) {
+  const query = validatePortalRunsQuery(req.query);
+  res.json(validatePortalRuns(getPortalRuns(query)));
 }
 
-export function getDownloads(_req: Request, res: Response) {
-  res.json(validatePortalDownloads(getPortalDownloads()));
+export function getDownloads(req: Request, res: Response) {
+  const query = validatePortalDownloadsQuery(req.query);
+  res.json(validatePortalDownloads(getPortalDownloads(query)));
 }

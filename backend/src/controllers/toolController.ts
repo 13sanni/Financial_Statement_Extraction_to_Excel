@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextFunction, Request, Response } from "express";
 import { buildIncomeStatementWorkbook } from "../services/excelService";
 import {
@@ -12,6 +13,8 @@ import { StatementMetadata, StatementRow } from "../types/statement";
 import { AppError } from "../utils/appError";
 import { extractWithGemini } from "../services/geminiExtractionService";
 import { hasGeminiConfig } from "../config/env";
+import { uploadRawBufferToCloudinary } from "../services/cloudinaryStorageService";
+import { saveExtractionRunMetadata } from "../services/extractionMetadataService";
 
 const MAX_TOTAL_UPLOAD_BYTES = 30 * 1024 * 1024;
 type ExtractionMode = "auto" | "gemini" | "rule";
@@ -51,6 +54,7 @@ export async function runIncomeStatementTool(
 ): Promise<void> {
   try {
     const files = (req.files as Express.Multer.File[]) || [];
+    const runId = randomUUID();
     const requestedMode = parseMode(req.query.mode);
     const canUseLlm = hasGeminiConfig();
     if (!files.length) {
@@ -73,26 +77,38 @@ export async function runIncomeStatementTool(
     const warnings = new Set<string>();
     const perFileResults = await Promise.all(
       files.map(async (file) => {
+        let extractionResult: { rows: StatementRow[]; metadata: StatementMetadata };
         try {
           if (effectiveMode === "gemini") {
-            return await extractWithGemini(file.originalname, await extractPdfText(file.buffer));
+            extractionResult = await extractWithGemini(file.originalname, await extractPdfText(file.buffer));
+          } else {
+            extractionResult = await extractWithRules(file);
           }
-          return await extractWithRules(file);
         } catch (error) {
           if (effectiveMode === "gemini" && requestedMode === "auto") {
             warnings.add(
               `Gemini extraction failed for ${file.originalname}; fallback to rule extraction.`,
             );
-            return await extractWithRules(file);
+            extractionResult = await extractWithRules(file);
+          } else {
+            throw error;
           }
-          throw error;
         }
+
+        const uploadedPdf = await uploadRawBufferToCloudinary(file.buffer, {
+          folderPath: `runs/${runId}/pdfs`,
+          fileName: file.originalname,
+        });
+
+        return { ...extractionResult, uploadedPdf, file };
       }),
     );
 
     const normalizedResults = perFileResults.map((item) => {
       if (item.rows.length > 0) return item;
       return {
+        file: item.file,
+        uploadedPdf: item.uploadedPdf,
         metadata: item.metadata,
         rows: [
           {
@@ -111,6 +127,42 @@ export async function runIncomeStatementTool(
     const metadata = validateStatementMetadata(normalizedResults.map((item) => item.metadata));
 
     const excelBuffer = await buildIncomeStatementWorkbook(allRows, metadata);
+    const uploadedExcel = await uploadRawBufferToCloudinary(excelBuffer, {
+      folderPath: `runs/${runId}/outputs`,
+      fileName: `income_statement_${runId}.xlsx`,
+    });
+
+    try {
+      await saveExtractionRunMetadata({
+        runId,
+        requestedMode,
+        effectiveMode,
+        status: "completed",
+        warnings: [...warnings],
+        totalFiles: files.length,
+        totalUploadBytes: totalBytes,
+        uploadedPdfs: normalizedResults.map((result) => ({
+          originalName: result.metadata.documentName,
+          mimeType: result.file.mimetype,
+          sizeBytes: result.file.size,
+          cloudinaryPublicId: result.uploadedPdf.publicId,
+          cloudinaryUrl: result.uploadedPdf.secureUrl,
+          years: result.metadata.years,
+          currency: result.metadata.currency,
+          units: result.metadata.units,
+          extractedRowCount: result.rows.length,
+        })),
+        outputExcel: {
+          fileName: `income_statement_${runId}.xlsx`,
+          sizeBytes: uploadedExcel.bytes,
+          cloudinaryPublicId: uploadedExcel.publicId,
+          cloudinaryUrl: uploadedExcel.secureUrl,
+        },
+      });
+    } catch (error) {
+      warnings.add("Metadata persistence failed for this run.");
+      console.error("Failed to save extraction metadata", error);
+    }
 
     res.setHeader(
       "Content-Type",
@@ -118,6 +170,8 @@ export async function runIncomeStatementTool(
     );
     res.setHeader("Content-Disposition", "attachment; filename=income_statement.xlsx");
     res.setHeader("X-Extraction-Mode", effectiveMode);
+    res.setHeader("X-Run-Id", runId);
+    res.setHeader("X-Output-Url", uploadedExcel.secureUrl);
     if (warnings.size) {
       res.setHeader("X-Extraction-Warnings", [...warnings].join(" | ").slice(0, 512));
     }
