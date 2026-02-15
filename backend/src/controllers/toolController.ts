@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { NextFunction, Request, Response } from "express";
 import { buildIncomeStatementWorkbook } from "../services/excelService";
 import {
+  detectPeriods,
   detectCurrency,
   detectUnits,
   detectYears,
@@ -35,6 +36,7 @@ async function extractWithRules(file: Express.Multer.File): Promise<{ rows: Stat
   const rows = extractStatementRows(file.originalname, text);
   const metadata: StatementMetadata = {
     documentName: file.originalname,
+    periods: detectPeriods(text),
     years: detectYears(text),
     currency: detectCurrency(text),
     units: detectUnits(text),
@@ -96,7 +98,11 @@ export async function runIncomeStatementTool(
         let extractionResult: { rows: StatementRow[]; metadata: StatementMetadata };
         try {
           if (effectiveMode === "gemini") {
-            extractionResult = await extractWithGemini(file.originalname, await extractPdfText(file.buffer));
+            extractionResult = await extractWithGemini(
+              file.originalname,
+              await extractPdfText(file.buffer),
+              file.buffer,
+            );
           } else {
             extractionResult = await extractWithRules(file);
           }

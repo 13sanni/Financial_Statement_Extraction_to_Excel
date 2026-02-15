@@ -6,6 +6,7 @@ const env_1 = require("../config/env");
 const appError_1 = require("../utils/appError");
 const extractionService_1 = require("./extractionService");
 const llmResponseSchema = zod_1.z.object({
+    periods: zod_1.z.array(zod_1.z.string().min(1)).max(8).optional(),
     years: zod_1.z.array(zod_1.z.string().regex(/^(19|20)\d{2}$/)).max(4).optional(),
     currency: zod_1.z.string().optional(),
     units: zod_1.z.string().optional(),
@@ -13,7 +14,7 @@ const llmResponseSchema = zod_1.z.object({
         .array(zod_1.z.object({
         normalizedLineItem: zod_1.z.string().min(1),
         rawLine: zod_1.z.string().min(1),
-        values: zod_1.z.array(zod_1.z.number().finite()).max(4),
+        values: zod_1.z.array(zod_1.z.number().finite()).max(8),
         ambiguity: zod_1.z.string().optional(),
         confidence: zod_1.z.number().min(0).max(1).optional(),
     }))
@@ -22,6 +23,11 @@ const llmResponseSchema = zod_1.z.object({
 const responseJsonSchema = {
     type: "object",
     properties: {
+        periods: {
+            type: "array",
+            items: { type: "string" },
+            maxItems: 8,
+        },
         years: {
             type: "array",
             items: { type: "string", pattern: "^(19|20)\\d{2}$" },
@@ -36,7 +42,7 @@ const responseJsonSchema = {
                 properties: {
                     normalizedLineItem: { type: "string" },
                     rawLine: { type: "string" },
-                    values: { type: "array", items: { type: "number" }, maxItems: 4 },
+                    values: { type: "array", items: { type: "number" }, maxItems: 8 },
                     ambiguity: { type: "string" },
                     confidence: { type: "number" },
                 },
@@ -66,36 +72,54 @@ function clampConfidence(value) {
         return 1;
     return value;
 }
-async function extractWithGemini(documentName, rawText) {
+async function extractWithGemini(documentName, rawText, pdfBuffer) {
     const candidateLines = (0, extractionService_1.selectCandidateFinancialLines)(rawText, 220);
     const fallbackMetadata = {
         documentName,
+        periods: (0, extractionService_1.detectPeriods)(rawText),
         years: (0, extractionService_1.detectYears)(rawText),
         currency: (0, extractionService_1.detectCurrency)(rawText),
         units: (0, extractionService_1.detectUnits)(rawText),
     };
-    if (!candidateLines.length) {
+    if (!candidateLines.length && !pdfBuffer) {
         return { rows: [], metadata: fallbackMetadata };
     }
     const prompt = `
 You are a financial extraction engine.
 Return JSON only with this schema.
-Extract only income statement line items from provided lines.
-Normalize labels to concise names (Revenue, Cost of Revenue, Gross Profit, Operating Expenses, Operating Income, Net Income, EPS, Other).
+Extract only income statement line items for a multi-period statement.
+Normalize labels to concise names such as:
+Revenue from Operations, Other Income, Total Income, Cost of Materials Consumed,
+Purchases of Stock-in-Trade, Change in Inventory, Gross Profit, Employee Benefits Expense,
+Other Expenses, EBITDA, Operating Income, Finance Costs, Depreciation and Amortization,
+Profit Before Tax, Tax Expense, Profit After Tax, EPS, Other.
 Use numbers exactly as present. Do not invent numbers.
+If periods are visible (for example FY25, Q1 FY26, 2025), return them in order in 'periods'.
+Extract up to 8 values per line item.
 
 Document: ${documentName}
 Known years (heuristic): ${fallbackMetadata.years.join(", ") || "unknown"}
+Known periods (heuristic): ${fallbackMetadata.periods.join(", ") || "unknown"}
 Known currency (heuristic): ${fallbackMetadata.currency}
 Known units (heuristic): ${fallbackMetadata.units}
 
-Financial lines:
-${candidateLines.join("\n")}
+${candidateLines.length ? `Financial lines:\n${candidateLines.join("\n")}` : "No extracted text lines were available. Read directly from the PDF document part."}
   `.trim();
     const geminiClient = await getClient();
+    const contents = pdfBuffer && !candidateLines.length
+        ? [
+            prompt,
+            {
+                inlineData: {
+                    data: pdfBuffer.toString("base64"),
+                    mimeType: "application/pdf",
+                },
+            },
+        ]
+        : prompt;
     const response = await geminiClient.models.generateContent({
         model: env_1.env.geminiModel,
-        contents: prompt,
+        contents,
         config: {
             temperature: 0,
             responseMimeType: "application/json",
@@ -119,6 +143,9 @@ ${candidateLines.join("\n")}
     }
     const normalizedMetadata = {
         documentName,
+        periods: parsed.data.periods && parsed.data.periods.length
+            ? parsed.data.periods
+            : fallbackMetadata.periods,
         years: parsed.data.years && parsed.data.years.length ? parsed.data.years : fallbackMetadata.years,
         currency: (parsed.data.currency || fallbackMetadata.currency || "UNKNOWN").toUpperCase(),
         units: (parsed.data.units || fallbackMetadata.units || "unknown").toLowerCase(),

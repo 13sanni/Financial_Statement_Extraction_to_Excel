@@ -23,6 +23,7 @@ async function extractWithRules(file) {
     const rows = (0, extractionService_1.extractStatementRows)(file.originalname, text);
     const metadata = {
         documentName: file.originalname,
+        periods: (0, extractionService_1.detectPeriods)(text),
         years: (0, extractionService_1.detectYears)(text),
         currency: (0, extractionService_1.detectCurrency)(text),
         units: (0, extractionService_1.detectUnits)(text),
@@ -71,7 +72,7 @@ async function runIncomeStatementTool(req, res, next) {
             let extractionResult;
             try {
                 if (effectiveMode === "gemini") {
-                    extractionResult = await (0, geminiExtractionService_1.extractWithGemini)(file.originalname, await (0, pdfService_1.extractPdfText)(file.buffer));
+                    extractionResult = await (0, geminiExtractionService_1.extractWithGemini)(file.originalname, await (0, pdfService_1.extractPdfText)(file.buffer), file.buffer);
                 }
                 else {
                     extractionResult = await extractWithRules(file);

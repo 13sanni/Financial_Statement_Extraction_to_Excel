@@ -8,13 +8,14 @@ const statementRowSchema = zod_1.z.object({
     documentName: zod_1.z.string().min(1),
     rawLine: zod_1.z.string(),
     normalizedLineItem: zod_1.z.string().min(1),
-    values: zod_1.z.array(zod_1.z.number().finite()).max(4),
+    values: zod_1.z.array(zod_1.z.number().finite()).max(8),
     ambiguity: zod_1.z.string(),
     confidence: zod_1.z.number().min(0).max(1),
 });
 const statementMetadataSchema = zod_1.z.object({
     documentName: zod_1.z.string().min(1),
-    years: zod_1.z.array(zod_1.z.string().regex(/^(19|20)\d{2}$/)).max(4),
+    periods: zod_1.z.array(zod_1.z.string().min(1)).max(8),
+    years: zod_1.z.array(zod_1.z.string().min(1)).max(8),
     currency: zod_1.z.string().min(1),
     units: zod_1.z.string().min(1),
 });

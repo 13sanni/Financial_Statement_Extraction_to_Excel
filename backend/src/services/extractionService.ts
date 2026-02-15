@@ -1,12 +1,56 @@
 import { StatementRow } from "../types/statement";
 
 const LINE_ITEM_PATTERNS: Array<{ normalized: string; patterns: RegExp[] }> = [
-  { normalized: "Revenue", patterns: [/\brevenue\b/i, /\bsales\b/i, /\btotal income\b/i] },
+  {
+    normalized: "Revenue from Operations",
+    patterns: [/\brevenue from (?:operations|ops)\b/i, /\bsales\b/i, /\brevenue\b/i],
+  },
+  { normalized: "Other Income", patterns: [/\bother income\b/i, /\bother sources?\b/i] },
+  { normalized: "Total Income", patterns: [/\btotal income\b/i] },
+  {
+    normalized: "Cost of Materials Consumed",
+    patterns: [/\bcost of materials? consumed\b/i],
+  },
+  {
+    normalized: "Purchases of Stock-in-Trade",
+    patterns: [/\bpurchases? of stock[- ]in[- ]trade\b/i],
+  },
+  {
+    normalized: "Change in Inventory",
+    patterns: [/\bchanges? in inventories?\b/i, /\bchange in inventory\b/i],
+  },
   { normalized: "Cost of Revenue", patterns: [/\bcost of revenue\b/i, /\bcost of sales\b/i] },
   { normalized: "Gross Profit", patterns: [/\bgross profit\b/i] },
-  { normalized: "Operating Expenses", patterns: [/\boperating expenses?\b/i, /\boperating costs?\b/i] },
+  {
+    normalized: "Employee Benefits Expense",
+    patterns: [/\bemployee benefits? expenses?\b/i, /\bstaff welfare expenses?\b/i],
+  },
+  { normalized: "Other Expenses", patterns: [/\bother expenses?\b/i] },
+  {
+    normalized: "Operating Expenses",
+    patterns: [/\boperating expenses?\b/i, /\boperating costs?\b/i],
+  },
+  { normalized: "EBITDA", patterns: [/\bebitda\b/i] },
   { normalized: "Operating Income", patterns: [/\boperating income\b/i, /\boperating profit\b/i, /\bebit\b/i] },
-  { normalized: "Net Income", patterns: [/\bnet income\b/i, /\bprofit for the year\b/i, /\bprofit attributable\b/i] },
+  { normalized: "Finance Costs", patterns: [/\bfinance costs?\b/i, /\binterest expense\b/i] },
+  {
+    normalized: "Depreciation and Amortization",
+    patterns: [/\bdepreciation\b/i, /\bamorti[sz]ation\b/i],
+  },
+  {
+    normalized: "Profit Before Tax",
+    patterns: [/\bprofit before tax\b/i, /\bpbt\b/i, /\bearnings before tax\b/i],
+  },
+  { normalized: "Tax Expense", patterns: [/\btax expenses?\b/i, /\bincome tax\b/i] },
+  {
+    normalized: "Profit After Tax",
+    patterns: [
+      /\bprofit after tax\b/i,
+      /\bnet income\b/i,
+      /\bprofit for the year\b/i,
+      /\bprofit attributable\b/i,
+    ],
+  },
   { normalized: "EPS", patterns: [/\bearnings per share\b/i, /\beps\b/i] },
 ];
 
@@ -71,6 +115,25 @@ export function detectYears(text: string): string[] {
   }
 
   return ranked.map(([year]) => String(year)).slice(0, 4);
+}
+
+export function detectPeriods(text: string): string[] {
+  const fyMatches = text.match(/\b(?:Q[1-4]\s*)?FY\s*'?\d{2,4}\b/gi) || [];
+  const normalized = fyMatches.map((token) =>
+    token
+      .replace(/\s+/g, " ")
+      .trim()
+      .toUpperCase()
+      .replace(/^Q([1-4])\s*FY\s*'?(\d{2,4})$/, "Q$1 FY$2")
+      .replace(/^FY\s*'?(\d{2,4})$/, "FY$1"),
+  );
+
+  const unique = [...new Set(normalized)];
+  if (unique.length) {
+    return unique.slice(0, 8);
+  }
+
+  return detectYears(text).slice(0, 8);
 }
 
 export function detectCurrency(text: string): string {
@@ -146,9 +209,9 @@ export function extractStatementRows(documentName: string, text: string): Statem
       documentName,
       rawLine: line,
       normalizedLineItem,
-      values: values.slice(0, 4),
-      ambiguity: values.length > 4 ? "More than 4 numeric values found in line" : "",
-      confidence: values.length > 4 ? 0.6 : 0.9,
+      values: values.slice(0, 8),
+      ambiguity: values.length > 8 ? "More than 8 numeric values found in line" : "",
+      confidence: values.length > 8 ? 0.6 : 0.9,
     });
   }
   return rows;
@@ -162,7 +225,7 @@ export function selectCandidateFinancialLines(text: string, maxLines = 220): str
   const financialLines = lines.filter((line) => {
     const hasMoneyToken = /\(?-?\d[\d,]*(?:\.\d+)?\)?/.test(line);
     const hasKeyword =
-      /\b(revenue|sales|income|expense|profit|loss|operating|ebit|eps|earnings|cost)\b/i.test(
+      /\b(revenue|sales|income|expense|profit|loss|operating|ebit|ebitda|eps|earnings|cost|tax|depreciation|finance)\b/i.test(
         line,
       );
     return hasMoneyToken && hasKeyword;

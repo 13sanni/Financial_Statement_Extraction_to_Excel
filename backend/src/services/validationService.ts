@@ -6,14 +6,15 @@ const statementRowSchema = z.object({
   documentName: z.string().min(1),
   rawLine: z.string(),
   normalizedLineItem: z.string().min(1),
-  values: z.array(z.number().finite()).max(4),
+  values: z.array(z.number().finite()).max(8),
   ambiguity: z.string(),
   confidence: z.number().min(0).max(1),
 });
 
 const statementMetadataSchema = z.object({
   documentName: z.string().min(1),
-  years: z.array(z.string().regex(/^(19|20)\d{2}$/)).max(4),
+  periods: z.array(z.string().min(1)).max(8),
+  years: z.array(z.string().min(1)).max(8),
   currency: z.string().min(1),
   units: z.string().min(1),
 });

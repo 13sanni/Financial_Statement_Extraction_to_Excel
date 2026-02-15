@@ -9,6 +9,7 @@ export type StatementRow = {
 
 export type StatementMetadata = {
   documentName: string;
+  periods: string[];
   years: string[];
   currency: string;
   units: string;

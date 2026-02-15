@@ -3,6 +3,7 @@ import { env } from "../config/env";
 import { StatementMetadata, StatementRow } from "../types/statement";
 import { AppError } from "../utils/appError";
 import {
+  detectPeriods,
   detectCurrency,
   detectUnits,
   detectYears,
@@ -10,18 +11,19 @@ import {
 } from "./extractionService";
 
 const llmResponseSchema = z.object({
+  periods: z.array(z.string().min(1)).max(8).optional(),
   years: z.array(z.string().regex(/^(19|20)\d{2}$/)).max(4).optional(),
   currency: z.string().optional(),
   units: z.string().optional(),
   lineItems: z
     .array(
-      z.object({
-        normalizedLineItem: z.string().min(1),
-        rawLine: z.string().min(1),
-        values: z.array(z.number().finite()).max(4),
-        ambiguity: z.string().optional(),
-        confidence: z.number().min(0).max(1).optional(),
-      }),
+        z.object({
+          normalizedLineItem: z.string().min(1),
+          rawLine: z.string().min(1),
+          values: z.array(z.number().finite()).max(8),
+          ambiguity: z.string().optional(),
+          confidence: z.number().min(0).max(1).optional(),
+        }),
     )
     .default([]),
 });
@@ -29,6 +31,11 @@ const llmResponseSchema = z.object({
 const responseJsonSchema = {
   type: "object",
   properties: {
+    periods: {
+      type: "array",
+      items: { type: "string" },
+      maxItems: 8,
+    },
     years: {
       type: "array",
       items: { type: "string", pattern: "^(19|20)\\d{2}$" },
@@ -43,7 +50,7 @@ const responseJsonSchema = {
         properties: {
           normalizedLineItem: { type: "string" },
           rawLine: { type: "string" },
-          values: { type: "array", items: { type: "number" }, maxItems: 4 },
+          values: { type: "array", items: { type: "number" }, maxItems: 8 },
           ambiguity: { type: "string" },
           confidence: { type: "number" },
         },
@@ -54,23 +61,9 @@ const responseJsonSchema = {
   required: ["lineItems"],
 };
 
-type GeminiClient = {
-  models: {
-    generateContent: (params: {
-      model: string;
-      contents: string;
-      config: {
-        temperature: number;
-        responseMimeType: string;
-        responseJsonSchema: unknown;
-      };
-    }) => Promise<{ text?: string }>;
-  };
-};
+let client: any = null;
 
-let client: GeminiClient | null = null;
-
-async function getClient(): Promise<GeminiClient> {
+async function getClient(): Promise<any> {
   if (!env.geminiApiKey) {
     throw new AppError("GEMINI_API_KEY is not configured.", 500);
   }
@@ -91,39 +84,59 @@ function clampConfidence(value: number | undefined): number {
 export async function extractWithGemini(
   documentName: string,
   rawText: string,
+  pdfBuffer?: Buffer,
 ): Promise<{ rows: StatementRow[]; metadata: StatementMetadata }> {
   const candidateLines = selectCandidateFinancialLines(rawText, 220);
   const fallbackMetadata: StatementMetadata = {
     documentName,
+    periods: detectPeriods(rawText),
     years: detectYears(rawText),
     currency: detectCurrency(rawText),
     units: detectUnits(rawText),
   };
 
-  if (!candidateLines.length) {
+  if (!candidateLines.length && !pdfBuffer) {
     return { rows: [], metadata: fallbackMetadata };
   }
 
   const prompt = `
 You are a financial extraction engine.
 Return JSON only with this schema.
-Extract only income statement line items from provided lines.
-Normalize labels to concise names (Revenue, Cost of Revenue, Gross Profit, Operating Expenses, Operating Income, Net Income, EPS, Other).
+Extract only income statement line items for a multi-period statement.
+Normalize labels to concise names such as:
+Revenue from Operations, Other Income, Total Income, Cost of Materials Consumed,
+Purchases of Stock-in-Trade, Change in Inventory, Gross Profit, Employee Benefits Expense,
+Other Expenses, EBITDA, Operating Income, Finance Costs, Depreciation and Amortization,
+Profit Before Tax, Tax Expense, Profit After Tax, EPS, Other.
 Use numbers exactly as present. Do not invent numbers.
+If periods are visible (for example FY25, Q1 FY26, 2025), return them in order in 'periods'.
+Extract up to 8 values per line item.
 
 Document: ${documentName}
 Known years (heuristic): ${fallbackMetadata.years.join(", ") || "unknown"}
+Known periods (heuristic): ${fallbackMetadata.periods.join(", ") || "unknown"}
 Known currency (heuristic): ${fallbackMetadata.currency}
 Known units (heuristic): ${fallbackMetadata.units}
 
-Financial lines:
-${candidateLines.join("\n")}
+${candidateLines.length ? `Financial lines:\n${candidateLines.join("\n")}` : "No extracted text lines were available. Read directly from the PDF document part."}
   `.trim();
 
   const geminiClient = await getClient();
+  const contents =
+    pdfBuffer && !candidateLines.length
+      ? [
+          prompt,
+          {
+            inlineData: {
+              data: pdfBuffer.toString("base64"),
+              mimeType: "application/pdf",
+            },
+          },
+        ]
+      : prompt;
   const response = await geminiClient.models.generateContent({
     model: env.geminiModel,
-    contents: prompt,
+    contents,
     config: {
       temperature: 0,
       responseMimeType: "application/json",
@@ -153,6 +166,10 @@ ${candidateLines.join("\n")}
 
   const normalizedMetadata: StatementMetadata = {
     documentName,
+    periods:
+      parsed.data.periods && parsed.data.periods.length
+        ? parsed.data.periods
+        : fallbackMetadata.periods,
     years: parsed.data.years && parsed.data.years.length ? parsed.data.years : fallbackMetadata.years,
     currency: (parsed.data.currency || fallbackMetadata.currency || "UNKNOWN").toUpperCase(),
     units: (parsed.data.units || fallbackMetadata.units || "unknown").toLowerCase(),

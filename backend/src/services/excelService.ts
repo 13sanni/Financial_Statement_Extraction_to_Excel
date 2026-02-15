@@ -1,6 +1,13 @@
 import ExcelJS from "exceljs";
 import { StatementMetadata, StatementRow } from "../types/statement";
 
+function pickPrimaryPeriods(metadata: StatementMetadata[]): string[] {
+  return metadata
+    .map((item) => item.periods || [])
+    .sort((a, b) => b.length - a.length)[0]
+    ?.slice(0, 8) || [];
+}
+
 export async function buildIncomeStatementWorkbook(
   rows: StatementRow[],
   metadata: StatementMetadata[],
@@ -8,20 +15,34 @@ export async function buildIncomeStatementWorkbook(
   const workbook = new ExcelJS.Workbook();
   const extractionSheet = workbook.addWorksheet("IncomeStatement");
   const metadataSheet = workbook.addWorksheet("Metadata");
+  const primaryPeriods = pickPrimaryPeriods(metadata);
+  const maxValues = Math.max(
+    1,
+    Math.min(
+      8,
+      Math.max(
+        rows.reduce((max, row) => Math.max(max, row.values.length), 0),
+        primaryPeriods.length,
+      ),
+    ),
+  );
+  const valueColumns = Array.from({ length: maxValues }, (_, index) => ({
+    header: primaryPeriods[index] || `Value ${index + 1}`,
+    key: `value${index + 1}`,
+    width: 14,
+  }));
 
   extractionSheet.columns = [
     { header: "Document", key: "documentName", width: 28 },
     { header: "Line Item", key: "normalizedLineItem", width: 24 },
-    { header: "Value 1", key: "value1", width: 14 },
-    { header: "Value 2", key: "value2", width: 14 },
-    { header: "Value 3", key: "value3", width: 14 },
-    { header: "Value 4", key: "value4", width: 14 },
+    ...valueColumns,
     { header: "Ambiguity Note", key: "ambiguity", width: 36 },
     { header: "Raw Line", key: "rawLine", width: 80 },
   ];
 
   metadataSheet.columns = [
     { header: "Document", key: "documentName", width: 28 },
+    { header: "Detected Periods", key: "periods", width: 28 },
     { header: "Detected Years", key: "years", width: 24 },
     { header: "Detected Currency", key: "currency", width: 20 },
     { header: "Detected Units", key: "units", width: 16 },
@@ -30,6 +51,7 @@ export async function buildIncomeStatementWorkbook(
   for (const item of metadata) {
     metadataSheet.addRow({
       documentName: item.documentName,
+      periods: item.periods.join(", "),
       years: item.years.join(", "),
       currency: item.currency,
       units: item.units,
@@ -45,12 +67,12 @@ export async function buildIncomeStatementWorkbook(
     });
   } else {
     for (const row of rows) {
+      const valueCells = Object.fromEntries(
+        Array.from({ length: maxValues }, (_, index) => [`value${index + 1}`, row.values[index] ?? null]),
+      );
       extractionSheet.addRow({
         ...row,
-        value1: row.values[0] ?? null,
-        value2: row.values[1] ?? null,
-        value3: row.values[2] ?? null,
-        value4: row.values[3] ?? null,
+        ...valueCells,
       });
     }
   }
