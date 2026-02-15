@@ -37,6 +37,15 @@ type DownloadItem = {
   downloadUrl: string;
 };
 
+type RunJobItem = {
+  jobId: string;
+  fileName: string;
+  status: "queued" | "processing" | "completed" | "failed";
+  warning: string;
+  failureReason: string;
+  updatedAt: string;
+};
+
 type PaginationOptions = {
   page: number;
   pageSize: number;
@@ -89,6 +98,7 @@ type JobRecord = {
   warning: string;
   errorMessage: string;
   createdAt: Date;
+  updatedAt: Date;
 };
 
 function paginateRows<T>(rows: T[], { page, pageSize }: PaginationOptions): PaginatedResult<T> {
@@ -177,10 +187,25 @@ async function loadJobsFromDb(): Promise<JobRecord[]> {
       warning: 1,
       errorMessage: 1,
       createdAt: 1,
+      updatedAt: 1,
       _id: 0,
     })
     .lean<JobRecord[]>();
   return rows;
+}
+
+export async function getPortalRunJobs(runId: string): Promise<RunJobItem[]> {
+  const jobs = (await loadJobsFromDb())
+    .filter((job) => job.runId === runId)
+    .map((job) => ({
+      jobId: job.jobId,
+      fileName: job.originalName,
+      status: job.status,
+      warning: job.warning || "",
+      failureReason: job.errorMessage || "",
+      updatedAt: formatDateTime(job.updatedAt || job.createdAt),
+    }));
+  return jobs;
 }
 
 export async function getPortalSummary(): Promise<SummaryCard[]> {

@@ -2,6 +2,7 @@ import axios from "axios";
 import { API_BASE_URL } from "../config/env";
 import {
   downloadsResponseSchema,
+  runJobsResponseSchema,
   runsResponseSchema,
   summaryResponseSchema,
   uploadQueueResponseSchema,
@@ -44,4 +45,9 @@ export async function getDownloads({ query, sort, page, pageSize }) {
     params: { query, sort, page, pageSize },
   });
   return parseOrThrow(downloadsResponseSchema, response.data, "downloads");
+}
+
+export async function getRunJobs(runId) {
+  const response = await portalApi.get(`/portal/runs/${encodeURIComponent(runId)}/jobs`);
+  return parseOrThrow(runJobsResponseSchema, response.data, "run jobs");
 }

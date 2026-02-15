@@ -48,3 +48,14 @@ export const summaryResponseSchema = z.array(summaryCardSchema);
 export const uploadQueueResponseSchema = paginatedResponseSchema(uploadQueueItemSchema);
 export const runsResponseSchema = paginatedResponseSchema(runItemSchema);
 export const downloadsResponseSchema = paginatedResponseSchema(downloadItemSchema);
+
+export const runJobsResponseSchema = z.array(
+  z.object({
+    jobId: z.string().min(1),
+    fileName: z.string().min(1),
+    status: z.enum(["queued", "processing", "completed", "failed"]),
+    warning: z.string(),
+    failureReason: z.string(),
+    updatedAt: z.string().min(1),
+  }),
+);

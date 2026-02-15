@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import {
   getPortalDownloads,
+  getPortalRunJobs,
   getPortalRuns,
   getPortalSummary,
   getPortalUploadQueue,
@@ -8,6 +9,8 @@ import {
 import {
   validatePortalDownloads,
   validatePortalDownloadsQuery,
+  validatePortalRunIdParam,
+  validatePortalRunJobs,
   validatePortalRuns,
   validatePortalRunsQuery,
   validatePortalSummary,
@@ -45,6 +48,15 @@ export async function getDownloads(req: Request, res: Response, next: NextFuncti
   try {
     const query = validatePortalDownloadsQuery(req.query);
     res.json(validatePortalDownloads(await getPortalDownloads(query)));
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getRunJobs(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { runId } = validatePortalRunIdParam(req.params);
+    res.json(validatePortalRunJobs(await getPortalRunJobs(runId)));
   } catch (error) {
     next(error);
   }

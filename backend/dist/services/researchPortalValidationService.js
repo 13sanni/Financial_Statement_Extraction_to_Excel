@@ -7,6 +7,8 @@ exports.validatePortalDownloads = validatePortalDownloads;
 exports.validatePortalUploadQueueQuery = validatePortalUploadQueueQuery;
 exports.validatePortalRunsQuery = validatePortalRunsQuery;
 exports.validatePortalDownloadsQuery = validatePortalDownloadsQuery;
+exports.validatePortalRunJobs = validatePortalRunJobs;
+exports.validatePortalRunIdParam = validatePortalRunIdParam;
 const zod_1 = require("zod");
 const appError_1 = require("../utils/appError");
 const summaryCardSchema = zod_1.z.object({
@@ -63,6 +65,17 @@ const downloadsQuerySchema = paginationQuerySchema.extend({
     query: zod_1.z.string().trim().optional().default(""),
     sort: zod_1.z.enum(["recent", "size-desc", "size-asc"]).default("recent"),
 });
+const runJobItemSchema = zod_1.z.object({
+    jobId: zod_1.z.string().min(1),
+    fileName: zod_1.z.string().min(1),
+    status: zod_1.z.enum(["queued", "processing", "completed", "failed"]),
+    warning: zod_1.z.string(),
+    failureReason: zod_1.z.string(),
+    updatedAt: zod_1.z.string().min(1),
+});
+const runIdParamSchema = zod_1.z.object({
+    runId: zod_1.z.string().min(1),
+});
 function parseOrThrow(schema, data, label) {
     const parsed = schema.safeParse(data);
     if (!parsed.success) {
@@ -91,4 +104,10 @@ function validatePortalRunsQuery(data) {
 }
 function validatePortalDownloadsQuery(data) {
     return parseOrThrow(downloadsQuerySchema, data, "downloads query");
+}
+function validatePortalRunJobs(data) {
+    return parseOrThrow(zod_1.z.array(runJobItemSchema), data, "run jobs");
+}
+function validatePortalRunIdParam(data) {
+    return parseOrThrow(runIdParamSchema, data, "run id param");
 }

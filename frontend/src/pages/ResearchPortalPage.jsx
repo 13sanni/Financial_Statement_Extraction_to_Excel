@@ -6,6 +6,7 @@ import StatusPill from "../components/ui/StatusPill";
 import { runIncomeStatementExtraction } from "../services/researchApi";
 import {
   getDownloads,
+  getRunJobs,
   getRuns,
   getSummary,
   getUploadQueue,
@@ -39,6 +40,8 @@ function ResearchPortalPage() {
   const [extractionMode, setExtractionMode] = useState("auto");
   const [lastSyncedAt, setLastSyncedAt] = useState("");
   const [expandedRunId, setExpandedRunId] = useState("");
+  const [runJobsById, setRunJobsById] = useState({});
+  const [runJobsLoadingId, setRunJobsLoadingId] = useState("");
   const fileInputRef = useRef(null);
   const queuedCard = summaryCards.find((card) => card.label === "Queued for Extraction");
   const queuedCount = Number.parseInt(queuedCard?.value || "0", 10) || 0;
@@ -178,6 +181,26 @@ function ResearchPortalPage() {
       setActionMessage(error instanceof Error ? error.message : "Failed to start extraction run.");
     } finally {
       setIsRunSubmitting(false);
+    }
+  }
+
+  async function toggleRunDetails(runId) {
+    if (expandedRunId === runId) {
+      setExpandedRunId("");
+      return;
+    }
+
+    setExpandedRunId(runId);
+    if (runJobsById[runId]) return;
+
+    try {
+      setRunJobsLoadingId(runId);
+      const runJobs = await getRunJobs(runId);
+      setRunJobsById((current) => ({ ...current, [runId]: runJobs }));
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Failed to load run job details.");
+    } finally {
+      setRunJobsLoadingId("");
     }
   }
 
@@ -431,17 +454,15 @@ function ResearchPortalPage() {
                   <p className="mt-1 text-xs text-slate-600">
                     Q:{run.queuedCount} P:{run.processingCount} C:{run.completedCount} F:{run.failedCount}
                   </p>
-                  {run.warning || run.failureReason ? (
-                    <Button
-                      variant="ghost"
-                      className="mt-2"
-                      onClick={() => setExpandedRunId((current) => (current === run.id ? "" : run.id))}
-                    >
-                      {expandedRunId === run.id ? "Hide Details" : "View Details"}
-                    </Button>
-                  ) : null}
+                  <Button
+                    variant="ghost"
+                    className="mt-2"
+                    onClick={() => toggleRunDetails(run.id)}
+                  >
+                    {expandedRunId === run.id ? "Hide Details" : "View Details"}
+                  </Button>
                 </div>
-                {expandedRunId === run.id && (run.warning || run.failureReason) ? (
+                {expandedRunId === run.id ? (
                   <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3">
                     {run.warning ? (
                       <p className="text-xs text-amber-700">
@@ -452,6 +473,43 @@ function ResearchPortalPage() {
                       <p className="mt-2 text-xs text-red-700">
                         <span className="font-semibold">Failure:</span> {run.failureReason}
                       </p>
+                    ) : null}
+                    {runJobsLoadingId === run.id ? (
+                      <p className="mt-3 text-xs text-slate-500">Loading file-level job details...</p>
+                    ) : null}
+                    {runJobsById[run.id]?.length ? (
+                      <div className="mt-3 overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr>
+                              <th className="border-b border-slate-200 px-1.5 py-1.5 text-left text-[11px] text-slate-500">
+                                File
+                              </th>
+                              <th className="border-b border-slate-200 px-1.5 py-1.5 text-left text-[11px] text-slate-500">
+                                Status
+                              </th>
+                              <th className="border-b border-slate-200 px-1.5 py-1.5 text-left text-[11px] text-slate-500">
+                                Updated
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {runJobsById[run.id].map((job) => (
+                              <tr key={job.jobId}>
+                                <td className="border-b border-slate-100 px-1.5 py-1.5 text-xs text-slate-700">
+                                  {job.fileName}
+                                </td>
+                                <td className="border-b border-slate-100 px-1.5 py-1.5 text-xs text-slate-700">
+                                  {job.status}
+                                </td>
+                                <td className="border-b border-slate-100 px-1.5 py-1.5 text-xs text-slate-700">
+                                  {job.updatedAt}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     ) : null}
                   </div>
                 ) : null}

@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getPortalRunJobs = getPortalRunJobs;
 exports.getPortalSummary = getPortalSummary;
 exports.getPortalUploadQueue = getPortalUploadQueue;
 exports.getPortalRuns = getPortalRuns;
@@ -90,10 +91,24 @@ async function loadJobsFromDb() {
         warning: 1,
         errorMessage: 1,
         createdAt: 1,
+        updatedAt: 1,
         _id: 0,
     })
         .lean();
     return rows;
+}
+async function getPortalRunJobs(runId) {
+    const jobs = (await loadJobsFromDb())
+        .filter((job) => job.runId === runId)
+        .map((job) => ({
+        jobId: job.jobId,
+        fileName: job.originalName,
+        status: job.status,
+        warning: job.warning || "",
+        failureReason: job.errorMessage || "",
+        updatedAt: formatDateTime(job.updatedAt || job.createdAt),
+    }));
+    return jobs;
 }
 async function getPortalSummary() {
     const [runs, jobs] = await Promise.all([loadRunsFromDb(), loadJobsFromDb()]);

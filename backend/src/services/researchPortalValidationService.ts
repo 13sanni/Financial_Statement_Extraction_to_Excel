@@ -65,6 +65,19 @@ const downloadsQuerySchema = paginationQuerySchema.extend({
   sort: z.enum(["recent", "size-desc", "size-asc"]).default("recent"),
 });
 
+const runJobItemSchema = z.object({
+  jobId: z.string().min(1),
+  fileName: z.string().min(1),
+  status: z.enum(["queued", "processing", "completed", "failed"]),
+  warning: z.string(),
+  failureReason: z.string(),
+  updatedAt: z.string().min(1),
+});
+
+const runIdParamSchema = z.object({
+  runId: z.string().min(1),
+});
+
 function parseOrThrow<T>(schema: z.ZodType<T>, data: unknown, label: string): T {
   const parsed = schema.safeParse(data);
   if (!parsed.success) {
@@ -100,4 +113,12 @@ export function validatePortalRunsQuery(data: unknown) {
 
 export function validatePortalDownloadsQuery(data: unknown) {
   return parseOrThrow(downloadsQuerySchema, data, "downloads query");
+}
+
+export function validatePortalRunJobs(data: unknown) {
+  return parseOrThrow(z.array(runJobItemSchema), data, "run jobs");
+}
+
+export function validatePortalRunIdParam(data: unknown) {
+  return parseOrThrow(runIdParamSchema, data, "run id param");
 }
