@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import path from "path";
 import { NextFunction, Request, Response } from "express";
 import { buildIncomeStatementWorkbook } from "../services/excelService";
 import {
@@ -29,6 +30,15 @@ type ExtractionMode = "auto" | "gemini" | "rule";
 function parseMode(value: unknown): ExtractionMode {
   if (value === "gemini" || value === "rule" || value === "auto") return value;
   return "auto";
+}
+
+function buildDownloadFileName(files: Express.Multer.File[]): string {
+  if (files.length === 1) {
+    const parsed = path.parse(files[0].originalname || "income_statement");
+    const base = (parsed.name || "income_statement").replace(/[^\w\s.-]/g, "").trim() || "income_statement";
+    return `${base}.xlsx`;
+  }
+  return "income_statement.xlsx";
 }
 
 async function extractWithRules(file: Express.Multer.File): Promise<{ rows: StatementRow[]; metadata: StatementMetadata }> {
@@ -214,7 +224,7 @@ export async function runIncomeStatementTool(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
-    res.setHeader("Content-Disposition", "attachment; filename=income_statement.xlsx");
+    res.setHeader("Content-Disposition", `attachment; filename="${buildDownloadFileName(files)}"`);
     res.setHeader("X-Extraction-Mode", effectiveMode);
     res.setHeader("X-Run-Id", runId);
     res.setHeader("X-Output-Url", uploadedExcel.secureUrl);

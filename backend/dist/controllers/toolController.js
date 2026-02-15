@@ -1,8 +1,12 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.uploadMetadata = uploadMetadata;
 exports.runIncomeStatementTool = runIncomeStatementTool;
 const crypto_1 = require("crypto");
+const path_1 = __importDefault(require("path"));
 const excelService_1 = require("../services/excelService");
 const extractionService_1 = require("../services/extractionService");
 const pdfService_1 = require("../services/pdfService");
@@ -17,6 +21,14 @@ function parseMode(value) {
     if (value === "gemini" || value === "rule" || value === "auto")
         return value;
     return "auto";
+}
+function buildDownloadFileName(files) {
+    if (files.length === 1) {
+        const parsed = path_1.default.parse(files[0].originalname || "income_statement");
+        const base = (parsed.name || "income_statement").replace(/[^\w\s.-]/g, "").trim() || "income_statement";
+        return `${base}.xlsx`;
+    }
+    return "income_statement.xlsx";
 }
 async function extractWithRules(file) {
     const text = await (0, pdfService_1.extractPdfText)(file.buffer);
@@ -173,7 +185,7 @@ async function runIncomeStatementTool(req, res, next) {
             console.error("Failed to save extraction metadata", error);
         }
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        res.setHeader("Content-Disposition", "attachment; filename=income_statement.xlsx");
+        res.setHeader("Content-Disposition", `attachment; filename="${buildDownloadFileName(files)}"`);
         res.setHeader("X-Extraction-Mode", effectiveMode);
         res.setHeader("X-Run-Id", runId);
         res.setHeader("X-Output-Url", uploadedExcel.secureUrl);
