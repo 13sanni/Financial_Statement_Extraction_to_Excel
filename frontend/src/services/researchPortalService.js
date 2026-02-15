@@ -1,6 +1,7 @@
 import axios from "axios";
 import { API_BASE_URL } from "../config/env";
 import {
+  deleteRunResponseSchema,
   downloadsResponseSchema,
   runJobsResponseSchema,
   runsResponseSchema,
@@ -50,4 +51,9 @@ export async function getDownloads({ query, sort, page, pageSize }) {
 export async function getRunJobs(runId) {
   const response = await portalApi.get(`/portal/runs/${encodeURIComponent(runId)}/jobs`);
   return parseOrThrow(runJobsResponseSchema, response.data, "run jobs");
+}
+
+export async function deleteRun(runId) {
+  const response = await portalApi.delete(`/portal/runs/${encodeURIComponent(runId)}`);
+  return parseOrThrow(deleteRunResponseSchema, response.data, "delete run");
 }

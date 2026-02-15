@@ -5,6 +5,7 @@ exports.getUploadQueue = getUploadQueue;
 exports.getRuns = getRuns;
 exports.getDownloads = getDownloads;
 exports.getRunJobs = getRunJobs;
+exports.deleteRun = deleteRun;
 const researchPortalService_1 = require("../services/researchPortalService");
 const researchPortalValidationService_1 = require("../services/researchPortalValidationService");
 async function getSummary(_req, res, next) {
@@ -46,6 +47,15 @@ async function getRunJobs(req, res, next) {
     try {
         const { runId } = (0, researchPortalValidationService_1.validatePortalRunIdParam)(req.params);
         res.json((0, researchPortalValidationService_1.validatePortalRunJobs)(await (0, researchPortalService_1.getPortalRunJobs)(runId)));
+    }
+    catch (error) {
+        next(error);
+    }
+}
+async function deleteRun(req, res, next) {
+    try {
+        const { runId } = (0, researchPortalValidationService_1.validatePortalRunIdParam)(req.params);
+        res.json((0, researchPortalValidationService_1.validateDeleteRunResponse)(await (0, researchPortalService_1.deletePortalRun)(runId)));
     }
     catch (error) {
         next(error);

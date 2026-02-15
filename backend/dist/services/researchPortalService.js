@@ -5,6 +5,7 @@ exports.getPortalSummary = getPortalSummary;
 exports.getPortalUploadQueue = getPortalUploadQueue;
 exports.getPortalRuns = getPortalRuns;
 exports.getPortalDownloads = getPortalDownloads;
+exports.deletePortalRun = deletePortalRun;
 const env_1 = require("../config/env");
 const extractionJob_1 = require("../models/extractionJob");
 const extractionRun_1 = require("../models/extractionRun");
@@ -303,4 +304,17 @@ async function getPortalDownloads(options) {
         return b.generatedAt.localeCompare(a.generatedAt);
     });
     return paginateRows(filtered, options);
+}
+async function deletePortalRun(runId) {
+    if (!(0, env_1.hasMongoConfig)()) {
+        return { deleted: false, runId };
+    }
+    const [runResult, jobsResult] = await Promise.all([
+        extractionRun_1.ExtractionRunModel.deleteOne({ runId }),
+        extractionJob_1.ExtractionJobModel.deleteMany({ runId }),
+    ]);
+    return {
+        deleted: runResult.deletedCount > 0 || jobsResult.deletedCount > 0,
+        runId,
+    };
 }

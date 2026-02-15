@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import {
+  deletePortalRun,
   getPortalDownloads,
   getPortalRunJobs,
   getPortalRuns,
@@ -7,6 +8,7 @@ import {
   getPortalUploadQueue,
 } from "../services/researchPortalService";
 import {
+  validateDeleteRunResponse,
   validatePortalDownloads,
   validatePortalDownloadsQuery,
   validatePortalRunIdParam,
@@ -57,6 +59,15 @@ export async function getRunJobs(req: Request, res: Response, next: NextFunction
   try {
     const { runId } = validatePortalRunIdParam(req.params);
     res.json(validatePortalRunJobs(await getPortalRunJobs(runId)));
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteRun(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { runId } = validatePortalRunIdParam(req.params);
+    res.json(validateDeleteRunResponse(await deletePortalRun(runId)));
   } catch (error) {
     next(error);
   }

@@ -423,3 +423,19 @@ export async function getPortalDownloads(options: DownloadsOptions): Promise<Pag
 
   return paginateRows(filtered, options);
 }
+
+export async function deletePortalRun(runId: string): Promise<{ deleted: boolean; runId: string }> {
+  if (!hasMongoConfig()) {
+    return { deleted: false, runId };
+  }
+
+  const [runResult, jobsResult] = await Promise.all([
+    ExtractionRunModel.deleteOne({ runId }),
+    ExtractionJobModel.deleteMany({ runId }),
+  ]);
+
+  return {
+    deleted: runResult.deletedCount > 0 || jobsResult.deletedCount > 0,
+    runId,
+  };
+}

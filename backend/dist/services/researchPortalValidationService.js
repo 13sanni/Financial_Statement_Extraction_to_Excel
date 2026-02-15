@@ -9,6 +9,7 @@ exports.validatePortalRunsQuery = validatePortalRunsQuery;
 exports.validatePortalDownloadsQuery = validatePortalDownloadsQuery;
 exports.validatePortalRunJobs = validatePortalRunJobs;
 exports.validatePortalRunIdParam = validatePortalRunIdParam;
+exports.validateDeleteRunResponse = validateDeleteRunResponse;
 const zod_1 = require("zod");
 const appError_1 = require("../utils/appError");
 const summaryCardSchema = zod_1.z.object({
@@ -81,6 +82,10 @@ const runJobItemSchema = zod_1.z.object({
 const runIdParamSchema = zod_1.z.object({
     runId: zod_1.z.string().min(1),
 });
+const deleteRunResponseSchema = zod_1.z.object({
+    deleted: zod_1.z.boolean(),
+    runId: zod_1.z.string().min(1),
+});
 function parseOrThrow(schema, data, label) {
     const parsed = schema.safeParse(data);
     if (!parsed.success) {
@@ -115,4 +120,7 @@ function validatePortalRunJobs(data) {
 }
 function validatePortalRunIdParam(data) {
     return parseOrThrow(runIdParamSchema, data, "run id param");
+}
+function validateDeleteRunResponse(data) {
+    return parseOrThrow(deleteRunResponseSchema, data, "delete run response");
 }

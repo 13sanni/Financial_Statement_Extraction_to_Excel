@@ -5,6 +5,7 @@ import Panel from "../components/ui/Panel";
 import StatusPill from "../components/ui/StatusPill";
 import { runIncomeStatementExtraction } from "../services/researchApi";
 import {
+  deleteRun,
   getDownloads,
   getRunJobs,
   getRuns,
@@ -203,6 +204,29 @@ function ResearchPortalPage() {
       setActionMessage(error instanceof Error ? error.message : "Failed to load run job details.");
     } finally {
       setRunJobsLoadingId("");
+    }
+  }
+
+  async function handleDeleteRun(runId) {
+    const confirmed = window.confirm(`Delete run ${runId} and all related job records?`);
+    if (!confirmed) return;
+
+    try {
+      const result = await deleteRun(runId);
+      if (!result.deleted) {
+        setActionMessage(`Run ${runId} was not found or already deleted.`);
+      } else {
+        setActionMessage(`Run ${runId} deleted successfully.`);
+      }
+      setExpandedRunId("");
+      setRunJobsById((current) => {
+        const next = { ...current };
+        delete next[runId];
+        return next;
+      });
+      setRefreshTick((value) => value + 1);
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Failed to delete run.");
     }
   }
 
@@ -579,6 +603,15 @@ function ResearchPortalPage() {
                         </table>
                       </div>
                     ) : null}
+                    <div className="mt-3 flex justify-end">
+                      <Button
+                        variant="ghost"
+                        className="text-red-700"
+                        onClick={() => handleDeleteRun(run.id)}
+                      >
+                        Delete Run
+                      </Button>
+                    </div>
                   </div>
                 ) : null}
               </li>

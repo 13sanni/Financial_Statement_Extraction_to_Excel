@@ -63,3 +63,8 @@ export const runJobsResponseSchema = z.array(
     outputExcelUrl: z.string(),
   }),
 );
+
+export const deleteRunResponseSchema = z.object({
+  deleted: z.boolean(),
+  runId: z.string().min(1),
+});

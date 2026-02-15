@@ -83,6 +83,11 @@ const runIdParamSchema = z.object({
   runId: z.string().min(1),
 });
 
+const deleteRunResponseSchema = z.object({
+  deleted: z.boolean(),
+  runId: z.string().min(1),
+});
+
 function parseOrThrow<T>(schema: z.ZodType<T>, data: unknown, label: string): T {
   const parsed = schema.safeParse(data);
   if (!parsed.success) {
@@ -126,4 +131,8 @@ export function validatePortalRunJobs(data: unknown) {
 
 export function validatePortalRunIdParam(data: unknown) {
   return parseOrThrow(runIdParamSchema, data, "run id param");
+}
+
+export function validateDeleteRunResponse(data: unknown) {
+  return parseOrThrow(deleteRunResponseSchema, data, "delete run response");
 }
