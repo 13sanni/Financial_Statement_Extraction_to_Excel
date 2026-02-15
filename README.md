@@ -2,6 +2,11 @@
 
 Web app to upload income-statement PDFs, extract key rows, and generate Excel output.
 
+You can add your deployed URLs below:
+
+- Frontend URL: https://financial-statement-extraction-to-e.vercel.app/
+- Backend URL: https://financial-statement-extraction-to-excel.onrender.com
+
 ## What This Solves
 
 Manual financial statement extraction is slow and error-prone.  
@@ -181,19 +186,11 @@ This version does **not** use cloud file storage.
   - `VITE_API_BASE_URL=<your-backend-url>`
 - Ensure backend CORS allows your frontend origin.
 
-You can add your deployed URLs below:
 
-- Frontend URL:https://financial-statement-extraction-to-e.vercel.app/login
-- Backend URL: `https://financial-statement-extraction-to-excel.onrender.com`
 
 ## Quality Checks
 
-Recommended before deploy:
 
-```bash
-# frontend
-npm run lint
-npm run build
 
 # backend
 npm run build
