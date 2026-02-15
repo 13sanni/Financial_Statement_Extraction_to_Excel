@@ -44,6 +44,8 @@ type RunJobItem = {
   warning: string;
   failureReason: string;
   updatedAt: string;
+  sourcePdfUrl: string;
+  outputExcelUrl: string;
 };
 
 type PaginationOptions = {
@@ -97,6 +99,8 @@ type JobRecord = {
   extractedRowCount: number;
   warning: string;
   errorMessage: string;
+  cloudinaryUrl: string;
+  outputExcelUrl: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -186,6 +190,8 @@ async function loadJobsFromDb(): Promise<JobRecord[]> {
       extractedRowCount: 1,
       warning: 1,
       errorMessage: 1,
+      cloudinaryUrl: 1,
+      outputExcelUrl: 1,
       createdAt: 1,
       updatedAt: 1,
       _id: 0,
@@ -204,6 +210,8 @@ export async function getPortalRunJobs(runId: string): Promise<RunJobItem[]> {
       warning: job.warning || "",
       failureReason: job.errorMessage || "",
       updatedAt: formatDateTime(job.updatedAt || job.createdAt),
+      sourcePdfUrl: job.cloudinaryUrl || "",
+      outputExcelUrl: job.outputExcelUrl || "",
     }));
   return jobs;
 }

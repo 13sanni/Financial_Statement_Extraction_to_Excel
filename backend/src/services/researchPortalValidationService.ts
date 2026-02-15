@@ -72,6 +72,8 @@ const runJobItemSchema = z.object({
   warning: z.string(),
   failureReason: z.string(),
   updatedAt: z.string().min(1),
+  sourcePdfUrl: z.string(),
+  outputExcelUrl: z.string(),
 });
 
 const runIdParamSchema = z.object({

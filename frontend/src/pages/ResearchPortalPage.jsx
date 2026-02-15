@@ -491,6 +491,9 @@ function ResearchPortalPage() {
                               <th className="border-b border-slate-200 px-1.5 py-1.5 text-left text-[11px] text-slate-500">
                                 Updated
                               </th>
+                              <th className="border-b border-slate-200 px-1.5 py-1.5 text-left text-[11px] text-slate-500">
+                                Links
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
@@ -504,6 +507,32 @@ function ResearchPortalPage() {
                                 </td>
                                 <td className="border-b border-slate-100 px-1.5 py-1.5 text-xs text-slate-700">
                                   {job.updatedAt}
+                                </td>
+                                <td className="border-b border-slate-100 px-1.5 py-1.5 text-xs text-slate-700">
+                                  <div className="flex items-center gap-2">
+                                    {job.sourcePdfUrl ? (
+                                      <button
+                                        type="button"
+                                        className="text-blue-700 underline"
+                                        onClick={() =>
+                                          window.open(job.sourcePdfUrl, "_blank", "noopener,noreferrer")
+                                        }
+                                      >
+                                        PDF
+                                      </button>
+                                    ) : null}
+                                    {job.outputExcelUrl ? (
+                                      <button
+                                        type="button"
+                                        className="text-blue-700 underline"
+                                        onClick={() =>
+                                          window.open(job.outputExcelUrl, "_blank", "noopener,noreferrer")
+                                        }
+                                      >
+                                        Excel
+                                      </button>
+                                    ) : null}
+                                  </div>
                                 </td>
                               </tr>
                             ))}

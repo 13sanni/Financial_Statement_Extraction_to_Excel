@@ -90,6 +90,8 @@ async function loadJobsFromDb() {
         extractedRowCount: 1,
         warning: 1,
         errorMessage: 1,
+        cloudinaryUrl: 1,
+        outputExcelUrl: 1,
         createdAt: 1,
         updatedAt: 1,
         _id: 0,
@@ -107,6 +109,8 @@ async function getPortalRunJobs(runId) {
         warning: job.warning || "",
         failureReason: job.errorMessage || "",
         updatedAt: formatDateTime(job.updatedAt || job.createdAt),
+        sourcePdfUrl: job.cloudinaryUrl || "",
+        outputExcelUrl: job.outputExcelUrl || "",
     }));
     return jobs;
 }
