@@ -12,6 +12,7 @@ import {
 } from "../services/researchPortalService";
 
 const PAGE_SIZE = 2;
+const POLL_INTERVAL_MS = 4000;
 const initialPagedData = { items: [], page: 1, pageSize: PAGE_SIZE, totalItems: 0, totalPages: 1 };
 
 function ResearchPortalPage() {
@@ -36,7 +37,10 @@ function ResearchPortalPage() {
   const [actionMessage, setActionMessage] = useState("");
   const [refreshTick, setRefreshTick] = useState(0);
   const [extractionMode, setExtractionMode] = useState("auto");
+  const [lastSyncedAt, setLastSyncedAt] = useState("");
   const fileInputRef = useRef(null);
+  const queuedCard = summaryCards.find((card) => card.label === "Queued for Extraction");
+  const queuedCount = Number.parseInt(queuedCard?.value || "0", 10) || 0;
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query.trim()), 250);
@@ -101,6 +105,7 @@ function ResearchPortalPage() {
         setUploadQueue(uploadData);
         setRuns(runsData);
         setDownloads(downloadsData);
+        setLastSyncedAt(new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }));
       } catch (error) {
         if (!isMounted) return;
         setLoadError(error instanceof Error ? error.message : "Failed to load research portal data");
@@ -114,6 +119,14 @@ function ResearchPortalPage() {
       isMounted = false;
     };
   }, [debouncedQuery, downloadSort, downloadsPage, refreshTick, runStatus, runsPage, uploadPage, uploadSort]);
+
+  useEffect(() => {
+    if (queuedCount <= 0) return;
+    const interval = setInterval(() => {
+      setRefreshTick((value) => value + 1);
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [queuedCount]);
 
   function openFilePicker() {
     fileInputRef.current?.click();
@@ -284,6 +297,10 @@ function ResearchPortalPage() {
           </div>
         ) : null}
         {isListLoading ? <p className="text-sm text-slate-500">Refreshing list data...</p> : null}
+        {queuedCount > 0 ? (
+          <p className="text-sm text-amber-700">Live refresh active (every 4s) while jobs are running.</p>
+        ) : null}
+        {lastSyncedAt ? <p className="text-xs text-slate-500">Last synced at {lastSyncedAt}</p> : null}
         {loadError ? <p className="text-sm font-medium text-red-600">{loadError}</p> : null}
         {actionMessage ? <p className="text-sm font-medium text-blue-700">{actionMessage}</p> : null}
       </Panel>
