@@ -183,7 +183,7 @@ This version does **not** use cloud file storage.
 
 You can add your deployed URLs below:
 
-- Frontend URL: `https://financial-statement-extraction-to-e.vercel.app/login`
+- Frontend URL:https://financial-statement-extraction-to-e.vercel.app/login
 - Backend URL: `https://financial-statement-extraction-to-excel.onrender.com`
 
 ## Quality Checks
