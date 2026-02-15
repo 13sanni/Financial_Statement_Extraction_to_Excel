@@ -1,26 +1,26 @@
-import {
-  downloads as mockDownloads,
-  runs as mockRuns,
-  summaryCards as mockSummaryCards,
-  uploadQueue as mockUploadQueue,
-} from "../pages/data/mockResearchData";
+import axios from "axios";
+import { API_BASE_URL } from "../config/env";
 
-function cloneRows(rows) {
-  return rows.map((row) => ({ ...row }));
-}
+const portalApi = axios.create({
+  baseURL: API_BASE_URL,
+});
 
 export async function getSummary() {
-  return cloneRows(mockSummaryCards);
+  const response = await portalApi.get("/portal/summary");
+  return response.data;
 }
 
 export async function getUploadQueue() {
-  return cloneRows(mockUploadQueue);
+  const response = await portalApi.get("/portal/upload-queue");
+  return response.data;
 }
 
 export async function getRuns() {
-  return cloneRows(mockRuns);
+  const response = await portalApi.get("/portal/runs");
+  return response.data;
 }
 
 export async function getDownloads() {
-  return cloneRows(mockDownloads);
+  const response = await portalApi.get("/portal/downloads");
+  return response.data;
 }
