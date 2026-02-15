@@ -35,6 +35,7 @@ function ResearchPortalPage() {
   const [isRunSubmitting, setIsRunSubmitting] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [refreshTick, setRefreshTick] = useState(0);
+  const [extractionMode, setExtractionMode] = useState("auto");
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -143,9 +144,9 @@ function ResearchPortalPage() {
     try {
       setIsRunSubmitting(true);
       setActionMessage("");
-      const { blob, extractionMode, warning, runId } = await runIncomeStatementExtraction({
+      const { blob, extractionMode: effectiveMode, warning, runId } = await runIncomeStatementExtraction({
         files: selectedFiles,
-        mode: "auto",
+        mode: extractionMode,
       });
 
       const downloadUrl = URL.createObjectURL(blob);
@@ -156,7 +157,7 @@ function ResearchPortalPage() {
       URL.revokeObjectURL(downloadUrl);
 
       const warningMessage = warning ? ` Warning: ${warning}` : "";
-      setActionMessage(`Run ${runId || "completed"} in ${extractionMode} mode.${warningMessage}`);
+      setActionMessage(`Run ${runId || "completed"} in ${effectiveMode} mode.${warningMessage}`);
       setSelectedFiles([]);
       setRefreshTick((value) => value + 1);
     } catch (error) {
@@ -207,7 +208,21 @@ function ResearchPortalPage() {
               placeholder="Search company, period, run ID, or file name..."
             />
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+            <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
+              Extraction Mode
+              <select
+                className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
+                value={extractionMode}
+                onChange={(event) => setExtractionMode(event.target.value)}
+                disabled={isRunSubmitting}
+              >
+                <option value="auto">Auto</option>
+                <option value="gemini">Gemini</option>
+                <option value="rule">Rule</option>
+              </select>
+            </label>
+
             <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
               Upload Sort
               <select
