@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { isAdmin } from "../services/authService";
 
 const baseItems = [
   { to: "/", label: "Home", end: true },
@@ -7,7 +8,8 @@ const baseItems = [
 ];
 
 function PortalNavbar({ className = "", showAdmin = false }) {
-  const navItems = showAdmin ? [...baseItems, { to: "/maintenance", label: "Admin" }] : baseItems;
+  const canShowAdmin = showAdmin && isAdmin();
+  const navItems = canShowAdmin ? [...baseItems, { to: "/maintenance", label: "Admin" }] : baseItems;
   return (
     <nav className={`w-full rounded-xl border border-slate-800 bg-slate-950/85 p-2 shadow-[0_10px_28px_rgba(2,6,23,0.65)] ${className}`}>
       <ul className="grid w-full grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
