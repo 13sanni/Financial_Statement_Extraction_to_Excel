@@ -75,7 +75,6 @@ const runJobItemSchema = z.object({
   warning: z.string(),
   failureReason: z.string(),
   updatedAt: z.string().min(1),
-  sourcePdfUrl: z.string(),
   outputExcelUrl: z.string(),
 });
 
@@ -86,6 +85,22 @@ const runIdParamSchema = z.object({
 const deleteRunResponseSchema = z.object({
   deleted: z.boolean(),
   runId: z.string().min(1),
+});
+
+const cleanupRunsBodySchema = z.object({
+  olderThanDays: z.coerce.number().int().min(1).max(3650).default(30),
+});
+
+const cleanupRunsResponseSchema = z.object({
+  olderThanDays: z.number().int().min(1),
+  cutoffIso: z.string().min(1),
+  deletedRuns: z.number().int().min(0),
+  deletedJobs: z.number().int().min(0),
+});
+
+const cleanupAllRunsResponseSchema = z.object({
+  deletedRuns: z.number().int().min(0),
+  deletedJobs: z.number().int().min(0),
 });
 
 function parseOrThrow<T>(schema: z.ZodType<T>, data: unknown, label: string): T {
@@ -135,4 +150,16 @@ export function validatePortalRunIdParam(data: unknown) {
 
 export function validateDeleteRunResponse(data: unknown) {
   return parseOrThrow(deleteRunResponseSchema, data, "delete run response");
+}
+
+export function validateCleanupRunsBody(data: unknown) {
+  return parseOrThrow(cleanupRunsBodySchema, data, "cleanup runs body");
+}
+
+export function validateCleanupRunsResponse(data: unknown) {
+  return parseOrThrow(cleanupRunsResponseSchema, data, "cleanup runs response");
+}
+
+export function validateCleanupAllRunsResponse(data: unknown) {
+  return parseOrThrow(cleanupAllRunsResponseSchema, data, "cleanup all runs response");
 }

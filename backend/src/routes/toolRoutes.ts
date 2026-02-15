@@ -1,5 +1,7 @@
 import { Router } from "express";
 import {
+  cleanupAllRuns,
+  cleanupOldRuns,
   deleteRun,
   getDownloads,
   getRunJobs,
@@ -19,7 +21,9 @@ router.get("/portal/summary", getSummary);
 router.get("/portal/upload-queue", getUploadQueue);
 router.get("/portal/runs", getRuns);
 router.get("/portal/runs/:runId/jobs", getRunJobs);
-router.delete("/portal/runs/:runId", requireAdmin, deleteRun);
+router.delete("/portal/runs/:runId", deleteRun);
+router.post("/portal/runs/cleanup", requireAdmin, cleanupOldRuns);
+router.post("/portal/runs/cleanup-all", requireAdmin, cleanupAllRuns);
 router.get("/portal/downloads", getDownloads);
 
 router.post("/upload", upload.array("files", 10), uploadMetadata);

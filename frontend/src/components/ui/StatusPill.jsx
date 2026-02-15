@@ -5,9 +5,9 @@ const labels = {
 };
 
 const classes = {
-  completed: "bg-emerald-100 text-emerald-800",
-  processing: "bg-blue-100 text-blue-800",
-  review: "bg-amber-100 text-amber-800",
+  completed: "bg-white/15 text-white",
+  processing: "bg-slate-500/30 text-slate-100",
+  review: "bg-slate-700 text-slate-100",
 };
 
 function StatusPill({ status }) {

@@ -1,133 +1,56 @@
 import { useEffect, useRef, useState } from "react";
-import { API_BASE_URL } from "../config/env";
+import { Link } from "react-router-dom";
 import Button from "../components/ui/Button";
 import Panel from "../components/ui/Panel";
 import StatusPill from "../components/ui/StatusPill";
+import { useToast } from "../components/ui/toastContext";
 import { runIncomeStatementExtraction } from "../services/researchApi";
-import {
-  deleteRun,
-  getDownloads,
-  getRunJobs,
-  getRuns,
-  getSummary,
-  getUploadQueue,
-} from "../services/researchPortalService";
+import { getRuns, getSummary, getUploadQueue } from "../services/researchPortalService";
 
 const POLL_INTERVAL_MS = 4000;
 const initialPagedData = { items: [], page: 1, pageSize: 5, totalItems: 0, totalPages: 1 };
 
 function ResearchPortalPage() {
-  const sectionHeadClass = "mb-3 flex items-center justify-between gap-3";
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [uploadSort, setUploadSort] = useState("company");
-  const [runStatus, setRunStatus] = useState("all");
-  const [runSort, setRunSort] = useState("recent");
-  const [downloadSort, setDownloadSort] = useState("recent");
   const [summaryCards, setSummaryCards] = useState([]);
   const [uploadQueue, setUploadQueue] = useState(initialPagedData);
-  const [runs, setRuns] = useState(initialPagedData);
-  const [downloads, setDownloads] = useState(initialPagedData);
-  const [uploadPage, setUploadPage] = useState(1);
-  const [runsPage, setRunsPage] = useState(1);
-  const [downloadsPage, setDownloadsPage] = useState(1);
-  const [uploadPageSize, setUploadPageSize] = useState(5);
-  const [runsPageSize, setRunsPageSize] = useState(5);
-  const [downloadsPageSize, setDownloadsPageSize] = useState(5);
-  const [isSummaryLoading, setIsSummaryLoading] = useState(true);
-  const [isListLoading, setIsListLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const [recentRuns, setRecentRuns] = useState(initialPagedData);
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRunSubmitting, setIsRunSubmitting] = useState(false);
-  const [actionMessage, setActionMessage] = useState("");
   const [refreshTick, setRefreshTick] = useState(0);
   const [extractionMode, setExtractionMode] = useState("auto");
-  const [lastSyncedAt, setLastSyncedAt] = useState("");
-  const [expandedRunId, setExpandedRunId] = useState("");
-  const [runJobsById, setRunJobsById] = useState({});
-  const [runJobsLoadingId, setRunJobsLoadingId] = useState("");
   const fileInputRef = useRef(null);
+  const { addToast } = useToast();
   const queuedCard = summaryCards.find((card) => card.label === "Queued for Extraction");
   const queuedCount = Number.parseInt(queuedCard?.value || "0", 10) || 0;
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 250);
-    return () => clearTimeout(timer);
-  }, [query]);
-
-  useEffect(() => {
-    setUploadPage(1);
-    setRunsPage(1);
-    setDownloadsPage(1);
-  }, [debouncedQuery, uploadSort, runStatus, runSort, downloadSort, uploadPageSize, runsPageSize, downloadsPageSize]);
-
-  useEffect(() => {
     let isMounted = true;
-    async function loadSummary() {
-      setIsSummaryLoading(true);
+    async function loadDashboard() {
+      setIsLoading(true);
       try {
-        const summaryData = await getSummary();
+        const [summaryData, queueData, runsData] = await Promise.all([
+          getSummary(),
+          getUploadQueue({ query: "", sort: "company", page: 1, pageSize: 5 }),
+          getRuns({ query: "", status: "all", sort: "recent", page: 1, pageSize: 3 }),
+        ]);
         if (!isMounted) return;
         setSummaryCards(summaryData);
+        setUploadQueue(queueData);
+        setRecentRuns(runsData);
       } catch (error) {
         if (!isMounted) return;
-        setLoadError(error instanceof Error ? error.message : "Failed to load portal summary");
+        addToast(error instanceof Error ? error.message : "Failed to load dashboard data.", { type: "error" });
       } finally {
-        if (isMounted) setIsSummaryLoading(false);
-      }
-    }
-    loadSummary();
-    return () => {
-      isMounted = false;
-    };
-  }, [refreshTick]);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function loadLists() {
-      setIsListLoading(true);
-      setLoadError("");
-      try {
-        const [uploadData, runsData, downloadsData] = await Promise.all([
-          getUploadQueue({
-            query: debouncedQuery,
-            sort: uploadSort,
-            page: uploadPage,
-            pageSize: uploadPageSize,
-          }),
-          getRuns({
-            query: debouncedQuery,
-            status: runStatus,
-            sort: runSort,
-            page: runsPage,
-            pageSize: runsPageSize,
-          }),
-          getDownloads({
-            query: debouncedQuery,
-            sort: downloadSort,
-            page: downloadsPage,
-            pageSize: downloadsPageSize,
-          }),
-        ]);
-
-        if (!isMounted) return;
-        setUploadQueue(uploadData);
-        setRuns(runsData);
-        setDownloads(downloadsData);
-        setLastSyncedAt(new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }));
-      } catch (error) {
-        if (!isMounted) return;
-        setLoadError(error instanceof Error ? error.message : "Failed to load research portal data");
-      } finally {
-        if (isMounted) setIsListLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     }
 
-    loadLists();
+    loadDashboard();
     return () => {
       isMounted = false;
     };
-  }, [debouncedQuery, downloadSort, downloadsPage, downloadsPageSize, refreshTick, runSort, runStatus, runsPage, runsPageSize, uploadPage, uploadPageSize, uploadSort]);
+  }, [addToast, refreshTick]);
 
   useEffect(() => {
     if (queuedCount <= 0) return;
@@ -150,7 +73,7 @@ function ResearchPortalPage() {
       return Array.from(existing.values());
     });
     event.target.value = "";
-    setActionMessage(`${incomingFiles.length} file(s) added to local run batch.`);
+    addToast(`${incomingFiles.length} file(s) added to local run batch.`, { type: "success" });
   }
 
   function clearSelectedFiles() {
@@ -159,13 +82,12 @@ function ResearchPortalPage() {
 
   async function handleStartRun() {
     if (!selectedFiles.length) {
-      setActionMessage("Add at least one PDF before starting a run.");
+      addToast("Add at least one PDF before starting a run.", { type: "error" });
       return;
     }
 
     try {
       setIsRunSubmitting(true);
-      setActionMessage("");
       const { blob, extractionMode: effectiveMode, warning, runId } = await runIncomeStatementExtraction({
         files: selectedFiles,
         mode: extractionMode,
@@ -179,105 +101,30 @@ function ResearchPortalPage() {
       URL.revokeObjectURL(downloadUrl);
 
       const warningMessage = warning ? ` Warning: ${warning}` : "";
-      setActionMessage(`Run ${runId || "completed"} in ${effectiveMode} mode.${warningMessage}`);
+      addToast(`Run ${runId || "completed"} in ${effectiveMode} mode.${warningMessage}`, { type: "success" });
       setSelectedFiles([]);
       setRefreshTick((value) => value + 1);
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Failed to start extraction run.");
+      addToast(error instanceof Error ? error.message : "Failed to start extraction run.", { type: "error" });
     } finally {
       setIsRunSubmitting(false);
     }
   }
 
-  async function toggleRunDetails(runId) {
-    if (expandedRunId === runId) {
-      setExpandedRunId("");
-      return;
-    }
-
-    setExpandedRunId(runId);
-    if (runJobsById[runId]) return;
-
-    try {
-      setRunJobsLoadingId(runId);
-      const runJobs = await getRunJobs(runId);
-      setRunJobsById((current) => ({ ...current, [runId]: runJobs }));
-    } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Failed to load run job details.");
-    } finally {
-      setRunJobsLoadingId("");
-    }
-  }
-
-  async function handleDeleteRun(runId) {
-    const confirmed = window.confirm(`Delete run ${runId} and all related job records?`);
-    if (!confirmed) return;
-
-    try {
-      const result = await deleteRun(runId);
-      if (!result.deleted) {
-        setActionMessage(`Run ${runId} was not found or already deleted.`);
-      } else {
-        setActionMessage(`Run ${runId} deleted successfully.`);
-      }
-      setExpandedRunId("");
-      setRunJobsById((current) => {
-        const next = { ...current };
-        delete next[runId];
-        return next;
-      });
-      setRefreshTick((value) => value + 1);
-    } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Failed to delete run.");
-    }
-  }
-
   return (
     <div className="grid gap-4">
-      <Panel className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <Panel className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">Research Portal</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Monitor uploads, extraction runs, and generated Excel outputs in one workspace.
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-white">Quick Start</p>
+          <h2 className="mt-1 text-xl font-semibold text-slate-100">Upload and Run Extraction</h2>
+          <p className="mt-2 text-sm text-slate-300">
+            1. Add PDF files. 2. Choose mode. 3. Start run. 4. Download Excel instantly.
           </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">
-            Backend API
-          </span>
-          <code className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-sm">
-            {API_BASE_URL}
-          </code>
-        </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/pdf,.pdf"
-          multiple
-          className="hidden"
-          onChange={handleFileSelection}
-        />
-      </Panel>
-
-      <Panel className="grid gap-3">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="w-full md:max-w-lg">
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
-              Global Search
-            </label>
-            <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search company, period, run ID, or file name..."
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
-            <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-400">
               Extraction Mode
               <select
-                className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
+                className="mt-1 block rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-slate-100"
                 value={extractionMode}
                 onChange={(event) => setExtractionMode(event.target.value)}
                 disabled={isRunSubmitting}
@@ -287,475 +134,121 @@ function ResearchPortalPage() {
                 <option value="rule">Rule</option>
               </select>
             </label>
-
-            <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
-              Upload Sort
-              <select
-                className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
-                value={uploadSort}
-                onChange={(event) => setUploadSort(event.target.value)}
-              >
-                <option value="company">Company (A-Z)</option>
-                <option value="pages-desc">Pages (High to Low)</option>
-                <option value="pages-asc">Pages (Low to High)</option>
-              </select>
-            </label>
-
-            <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
-              Run Status
-              <select
-                className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
-                value={runStatus}
-                onChange={(event) => setRunStatus(event.target.value)}
-              >
-                <option value="all">All</option>
-                <option value="processing">Processing</option>
-                <option value="completed">Completed</option>
-                <option value="review">Needs Review</option>
-              </select>
-            </label>
-
-            <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
-              Run Sort
-              <select
-                className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
-                value={runSort}
-                onChange={(event) => setRunSort(event.target.value)}
-              >
-                <option value="recent">Recent</option>
-                <option value="progress-desc">Highest Progress</option>
-                <option value="progress-asc">Lowest Progress</option>
-              </select>
-            </label>
-
-            <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
-              Export Sort
-              <select
-                className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
-                value={downloadSort}
-                onChange={(event) => setDownloadSort(event.target.value)}
-              >
-                <option value="recent">Recent First</option>
-                <option value="size-desc">Largest First</option>
-                <option value="size-asc">Smallest First</option>
-              </select>
-            </label>
+            <Button variant="secondary" onClick={openFilePicker}>
+              Add Statement
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleStartRun}
+              disabled={isRunSubmitting}
+              className={isRunSubmitting ? "cursor-not-allowed opacity-60" : ""}
+            >
+              {isRunSubmitting ? "Running..." : "Start Run"}
+            </Button>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            multiple
+            className="hidden"
+            onChange={handleFileSelection}
+          />
+          {selectedFiles.length ? (
+            <div className="mt-3 rounded-lg border border-slate-700 bg-slate-950/50 p-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-300">
+                  Local Batch ({selectedFiles.length})
+                </p>
+                <Button variant="ghost" onClick={clearSelectedFiles}>
+                  Clear
+                </Button>
+              </div>
+              <ul className="grid gap-1">
+                {selectedFiles.map((file) => (
+                  <li key={`${file.name}-${file.size}`} className="text-xs text-slate-200">
+                    {file.name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+        <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-400">Portal Navigation</p>
+          <div className="mt-3 grid gap-2">
+            <Link to="/runs" className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">
+              Go to Runs
+            </Link>
+            <Link to="/exports" className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">
+              Go to Exports
+            </Link>
+            <Link to="/maintenance" className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">
+              Go to Maintenance
+            </Link>
           </div>
         </div>
-        {selectedFiles.length ? (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-600">
-                Local Batch ({selectedFiles.length})
-              </p>
-              <Button variant="ghost" onClick={clearSelectedFiles}>
-                Clear
-              </Button>
-            </div>
-            <ul className="grid gap-1">
-              {selectedFiles.map((file) => (
-                <li key={`${file.name}-${file.size}`} className="text-xs text-slate-700">
-                  {file.name}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-        {isListLoading ? <p className="text-sm text-slate-500">Refreshing list data...</p> : null}
-        {queuedCount > 0 ? (
-          <p className="text-sm text-amber-700">Live refresh active (every 4s) while jobs are running.</p>
-        ) : null}
-        {lastSyncedAt ? <p className="text-xs text-slate-500">Last synced at {lastSyncedAt}</p> : null}
-        {loadError ? <p className="text-sm font-medium text-red-600">{loadError}</p> : null}
-        {actionMessage ? <p className="text-sm font-medium text-blue-700">{actionMessage}</p> : null}
       </Panel>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {isSummaryLoading ? (
-          <p className="text-sm text-slate-500">Loading summary...</p>
-        ) : null}
+        {isLoading ? <p className="text-sm text-slate-400">Loading summary...</p> : null}
         {summaryCards.map((card) => (
           <Panel key={card.label} as="article">
-            <p className="text-xs uppercase tracking-[0.04em] text-slate-500">{card.label}</p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">{card.value}</p>
-            <p className="mt-1 text-sm text-slate-600">{card.delta}</p>
+            <p className="text-xs uppercase tracking-[0.04em] text-slate-400">{card.label}</p>
+            <p className="mt-2 text-3xl font-bold text-slate-100">{card.value}</p>
+            <p className="mt-1 text-sm text-slate-300">{card.delta}</p>
           </Panel>
         ))}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
         <Panel as="article">
-          <div className={sectionHeadClass}>
-            <h3 className="text-base font-semibold text-slate-900">Upload Queue</h3>
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
-                Page Size
-                <select
-                  className="ml-2 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900"
-                  value={uploadPageSize}
-                  onChange={(event) => setUploadPageSize(Number(event.target.value))}
-                >
-                  <option value={3}>3</option>
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                </select>
-              </label>
-              <Button variant="secondary" onClick={openFilePicker}>
-                Add Statement
-              </Button>
-            </div>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-base font-semibold text-slate-100">Upload Queue (Preview)</h3>
+            <Link to="/runs" className="text-sm font-semibold text-white hover:underline">
+              View Runs
+            </Link>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="border-b border-slate-200 px-1.5 py-2 text-left text-xs font-semibold text-slate-500">
-                    Company
-                  </th>
-                  <th className="border-b border-slate-200 px-1.5 py-2 text-left text-xs font-semibold text-slate-500">
-                    Period
-                  </th>
-                  <th className="border-b border-slate-200 px-1.5 py-2 text-left text-xs font-semibold text-slate-500">
-                    Pages
-                  </th>
-                  <th className="border-b border-slate-200 px-1.5 py-2 text-left text-xs font-semibold text-slate-500">
-                    Uploaded By
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {uploadQueue.items.map((item) => (
-                  <tr key={`${item.company}-${item.period}`}>
-                    <td className="whitespace-nowrap border-b border-slate-100 px-1.5 py-2 text-sm text-slate-900">
-                      {item.company}
-                    </td>
-                    <td className="whitespace-nowrap border-b border-slate-100 px-1.5 py-2 text-sm text-slate-900">
-                      {item.period}
-                    </td>
-                    <td className="whitespace-nowrap border-b border-slate-100 px-1.5 py-2 text-sm text-slate-900">
-                      {item.pages}
-                    </td>
-                    <td className="whitespace-nowrap border-b border-slate-100 px-1.5 py-2 text-sm text-slate-900">
-                      {item.uploadedBy}
-                    </td>
-                  </tr>
-                ))}
-                {!isListLoading && uploadQueue.items.length === 0 ? (
-                  <tr>
-                    <td className="px-1.5 py-3 text-sm text-slate-500" colSpan={4}>
-                      No upload rows match your current filters.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-3 flex items-center justify-between">
-            <p className="text-xs text-slate-500">
-              Page {uploadQueue.page} of {uploadQueue.totalPages} ({uploadQueue.totalItems} total)
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => setUploadPage((current) => Math.max(1, current - 1))}
-                disabled={uploadQueue.page <= 1 || isListLoading}
-                className={uploadQueue.page <= 1 || isListLoading ? "cursor-not-allowed opacity-50" : ""}
-              >
-                Prev
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setUploadPage((current) => Math.min(uploadQueue.totalPages, current + 1))}
-                disabled={uploadQueue.page >= uploadQueue.totalPages || isListLoading}
-                className={
-                  uploadQueue.page >= uploadQueue.totalPages || isListLoading
-                    ? "cursor-not-allowed opacity-50"
-                    : ""
-                }
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+          <ul className="grid gap-2">
+            {uploadQueue.items.map((item) => (
+              <li key={`${item.company}-${item.period}`} className="rounded-lg border border-slate-700 bg-slate-950/40 p-3">
+                <p className="text-sm font-semibold text-slate-100">{item.company}</p>
+                <p className="text-xs text-slate-300">
+                  {item.period} · {item.pages} pages · {item.uploadedBy}
+                </p>
+              </li>
+            ))}
+            {!isLoading && uploadQueue.items.length === 0 ? (
+              <li className="rounded-lg border border-dashed border-slate-600 p-3 text-sm text-slate-400">
+                Upload queue is currently empty.
+              </li>
+            ) : null}
+          </ul>
         </Panel>
 
         <Panel as="article">
-          <div className={sectionHeadClass}>
-            <h3 className="text-base font-semibold text-slate-900">Extraction Runs</h3>
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
-                Page Size
-                <select
-                  className="ml-2 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900"
-                  value={runsPageSize}
-                  onChange={(event) => setRunsPageSize(Number(event.target.value))}
-                >
-                  <option value={3}>3</option>
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                </select>
-              </label>
-              <Button
-                variant="primary"
-                onClick={handleStartRun}
-                disabled={isRunSubmitting}
-                className={isRunSubmitting ? "cursor-not-allowed opacity-60" : ""}
-              >
-                {isRunSubmitting ? "Running..." : "Start Run"}
-              </Button>
-            </div>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-base font-semibold text-slate-100">Recent Runs</h3>
+            <Link to="/runs" className="text-sm font-semibold text-white hover:underline">
+              Open Runs
+            </Link>
           </div>
-          <ul className="grid gap-3">
-            {runs.items.map((run) => (
-              <li
-                key={run.id}
-                className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="font-semibold text-slate-900">{run.company}</p>
-                  <p className="mt-1 text-xs text-slate-600">
-                    {run.id} · Started {run.started}
-                  </p>
-                </div>
-                <div className="text-left sm:text-right">
+          <ul className="grid gap-2">
+            {recentRuns.items.map((run) => (
+              <li key={run.id} className="rounded-lg border border-slate-700 bg-slate-950/40 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-100">{run.company}</p>
                   <StatusPill status={run.status} />
-                  <p className="mt-1 text-xs text-slate-600">Confidence {run.confidence}</p>
-                  <p className="mt-1 text-xs text-slate-600">
-                    Q:{run.queuedCount} P:{run.processingCount} C:{run.completedCount} F:{run.failedCount}
-                  </p>
-                  <div className="mt-2 w-full sm:w-44">
-                    <div className="h-1.5 w-full rounded-full bg-slate-200">
-                      <div
-                        className={`h-1.5 rounded-full ${
-                          run.status === "review"
-                            ? "bg-amber-500"
-                            : run.status === "completed"
-                              ? "bg-emerald-500"
-                              : "bg-blue-500"
-                        }`}
-                        style={{ width: `${run.progressPercent}%` }}
-                      />
-                    </div>
-                    <p className="mt-1 text-[11px] text-slate-500">{run.progressPercent}% complete</p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    className="mt-2"
-                    onClick={() => toggleRunDetails(run.id)}
-                  >
-                    {expandedRunId === run.id ? "Hide Details" : "View Details"}
-                  </Button>
-                  {run.outputExcelUrl ? (
-                    <Button
-                      variant="ghost"
-                      className="mt-2"
-                      onClick={() => window.open(run.outputExcelUrl, "_blank", "noopener,noreferrer")}
-                    >
-                      Open Output
-                    </Button>
-                  ) : null}
                 </div>
-                {expandedRunId === run.id ? (
-                  <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    {run.warning ? (
-                      <p className="text-xs text-amber-700">
-                        <span className="font-semibold">Warning:</span> {run.warning}
-                      </p>
-                    ) : null}
-                    {run.failureReason ? (
-                      <p className="mt-2 text-xs text-red-700">
-                        <span className="font-semibold">Failure:</span> {run.failureReason}
-                      </p>
-                    ) : null}
-                    {runJobsLoadingId === run.id ? (
-                      <p className="mt-3 text-xs text-slate-500">Loading file-level job details...</p>
-                    ) : null}
-                    {runJobsById[run.id]?.length ? (
-                      <div className="mt-3 overflow-x-auto">
-                        <table className="w-full border-collapse">
-                          <thead>
-                            <tr>
-                              <th className="border-b border-slate-200 px-1.5 py-1.5 text-left text-[11px] text-slate-500">
-                                File
-                              </th>
-                              <th className="border-b border-slate-200 px-1.5 py-1.5 text-left text-[11px] text-slate-500">
-                                Status
-                              </th>
-                              <th className="border-b border-slate-200 px-1.5 py-1.5 text-left text-[11px] text-slate-500">
-                                Updated
-                              </th>
-                              <th className="border-b border-slate-200 px-1.5 py-1.5 text-left text-[11px] text-slate-500">
-                                Links
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {runJobsById[run.id].map((job) => (
-                              <tr key={job.jobId}>
-                                <td className="border-b border-slate-100 px-1.5 py-1.5 text-xs text-slate-700">
-                                  {job.fileName}
-                                </td>
-                                <td className="border-b border-slate-100 px-1.5 py-1.5 text-xs text-slate-700">
-                                  {job.status}
-                                </td>
-                                <td className="border-b border-slate-100 px-1.5 py-1.5 text-xs text-slate-700">
-                                  {job.updatedAt}
-                                </td>
-                                <td className="border-b border-slate-100 px-1.5 py-1.5 text-xs text-slate-700">
-                                  <div className="flex items-center gap-2">
-                                    {job.sourcePdfUrl ? (
-                                      <button
-                                        type="button"
-                                        className="text-blue-700 underline"
-                                        onClick={() =>
-                                          window.open(job.sourcePdfUrl, "_blank", "noopener,noreferrer")
-                                        }
-                                      >
-                                        PDF
-                                      </button>
-                                    ) : null}
-                                    {job.outputExcelUrl ? (
-                                      <button
-                                        type="button"
-                                        className="text-blue-700 underline"
-                                        onClick={() =>
-                                          window.open(job.outputExcelUrl, "_blank", "noopener,noreferrer")
-                                        }
-                                      >
-                                        Excel
-                                      </button>
-                                    ) : null}
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : null}
-                    <div className="mt-3 flex justify-end">
-                      <Button
-                        variant="ghost"
-                        className="text-red-700"
-                        onClick={() => handleDeleteRun(run.id)}
-                      >
-                        Delete Run
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
+                <p className="mt-1 text-xs text-slate-300">{run.id}</p>
               </li>
             ))}
-            {!isListLoading && runs.items.length === 0 ? (
-              <li className="rounded-xl border border-dashed border-slate-300 p-3 text-sm text-slate-500">
-                No extraction runs match your current filters.
+            {!isLoading && recentRuns.items.length === 0 ? (
+              <li className="rounded-lg border border-dashed border-slate-600 p-3 text-sm text-slate-400">
+                No recent runs yet.
               </li>
             ) : null}
           </ul>
-          <div className="mt-3 flex items-center justify-between">
-            <p className="text-xs text-slate-500">
-              Page {runs.page} of {runs.totalPages} ({runs.totalItems} total)
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => setRunsPage((current) => Math.max(1, current - 1))}
-                disabled={runs.page <= 1 || isListLoading}
-                className={runs.page <= 1 || isListLoading ? "cursor-not-allowed opacity-50" : ""}
-              >
-                Prev
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setRunsPage((current) => Math.min(runs.totalPages, current + 1))}
-                disabled={runs.page >= runs.totalPages || isListLoading}
-                className={
-                  runs.page >= runs.totalPages || isListLoading ? "cursor-not-allowed opacity-50" : ""
-                }
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        </Panel>
-
-        <Panel as="article" className="lg:col-span-2">
-          <div className={sectionHeadClass}>
-            <h3 className="text-base font-semibold text-slate-900">Latest Excel Exports</h3>
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
-                Page Size
-                <select
-                  className="ml-2 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900"
-                  value={downloadsPageSize}
-                  onChange={(event) => setDownloadsPageSize(Number(event.target.value))}
-                >
-                  <option value={3}>3</option>
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                </select>
-              </label>
-              <Button variant="secondary" onClick={() => setDownloadsPage(1)}>
-                View All
-              </Button>
-            </div>
-          </div>
-          <ul className="grid gap-3">
-            {downloads.items.map((download) => (
-              <li
-                key={download.id}
-                className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="font-semibold text-slate-900">{download.file}</p>
-                  <p className="mt-1 text-xs text-slate-600">Generated {download.generatedAt}</p>
-                </div>
-                <div className="flex items-center gap-3 text-left sm:text-right">
-                  <span className="text-sm text-slate-700">{download.size}</span>
-                  <Button
-                    variant="ghost"
-                    onClick={() => window.open(download.downloadUrl, "_blank", "noopener,noreferrer")}
-                  >
-                    Download
-                  </Button>
-                </div>
-              </li>
-            ))}
-            {!isListLoading && downloads.items.length === 0 ? (
-              <li className="rounded-xl border border-dashed border-slate-300 p-3 text-sm text-slate-500">
-                No exports match your current filters.
-              </li>
-            ) : null}
-          </ul>
-          <div className="mt-3 flex items-center justify-between">
-            <p className="text-xs text-slate-500">
-              Page {downloads.page} of {downloads.totalPages} ({downloads.totalItems} total)
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => setDownloadsPage((current) => Math.max(1, current - 1))}
-                disabled={downloads.page <= 1 || isListLoading}
-                className={downloads.page <= 1 || isListLoading ? "cursor-not-allowed opacity-50" : ""}
-              >
-                Prev
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  setDownloadsPage((current) => Math.min(downloads.totalPages, current + 1))
-                }
-                disabled={downloads.page >= downloads.totalPages || isListLoading}
-                className={
-                  downloads.page >= downloads.totalPages || isListLoading
-                    ? "cursor-not-allowed opacity-50"
-                    : ""
-                }
-              >
-                Next
-              </Button>
-            </div>
-          </div>
         </Panel>
       </section>
     </div>

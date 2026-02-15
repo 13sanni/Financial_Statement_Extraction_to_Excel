@@ -16,8 +16,8 @@ type CompleteJobInput = {
   units: string;
   extractedRowCount: number;
   warning?: string;
-  cloudinaryPublicId: string;
-  cloudinaryUrl: string;
+  storagePublicId: string;
+  storageUrl: string;
   outputExcelUrl: string;
 };
 
@@ -41,8 +41,8 @@ export async function createQueuedJobs(inputs: QueuedJobInput[]): Promise<Array<
     extractedRowCount: 0,
     warning: "",
     errorMessage: "",
-    cloudinaryPublicId: "",
-    cloudinaryUrl: "",
+    storagePublicId: "",
+    storageUrl: "",
     outputExcelUrl: "",
   }));
 
@@ -70,8 +70,8 @@ export async function markJobCompleted(input: CompleteJobInput): Promise<void> {
         units: input.units,
         extractedRowCount: input.extractedRowCount,
         warning: input.warning || "",
-        cloudinaryPublicId: input.cloudinaryPublicId,
-        cloudinaryUrl: input.cloudinaryUrl,
+        storagePublicId: input.storagePublicId,
+        storageUrl: input.storageUrl,
         outputExcelUrl: input.outputExcelUrl,
         completedAt: new Date(),
       },

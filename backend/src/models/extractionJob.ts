@@ -17,8 +17,8 @@ export type ExtractionJobDocument = {
   extractedRowCount: number;
   warning: string;
   errorMessage: string;
-  cloudinaryPublicId: string;
-  cloudinaryUrl: string;
+  storagePublicId: string;
+  storageUrl: string;
   outputExcelUrl: string;
   createdAt: Date;
   updatedAt: Date;
@@ -43,8 +43,8 @@ const extractionJobSchema = new Schema<ExtractionJobDocument>(
     extractedRowCount: { type: Number, required: true, default: 0 },
     warning: { type: String, required: false, default: "" },
     errorMessage: { type: String, required: false, default: "" },
-    cloudinaryPublicId: { type: String, required: false, default: "" },
-    cloudinaryUrl: { type: String, required: false, default: "" },
+    storagePublicId: { type: String, required: false, default: "" },
+    storageUrl: { type: String, required: false, default: "" },
     outputExcelUrl: { type: String, required: false, default: "" },
     startedAt: { type: Date, required: false },
     completedAt: { type: Date, required: false },

@@ -2,6 +2,8 @@ import axios from "axios";
 import { API_BASE_URL } from "../config/env";
 import { getAuthToken } from "./authService";
 import {
+  cleanupAllRunsResponseSchema,
+  cleanupRunsResponseSchema,
   deleteRunResponseSchema,
   downloadsResponseSchema,
   runJobsResponseSchema,
@@ -66,4 +68,14 @@ export async function getRunJobs(runId) {
 export async function deleteRun(runId) {
   const response = await portalApi.delete(`/portal/runs/${encodeURIComponent(runId)}`);
   return parseOrThrow(deleteRunResponseSchema, response.data, "delete run");
+}
+
+export async function cleanupOldRuns({ olderThanDays }) {
+  const response = await portalApi.post("/portal/runs/cleanup", { olderThanDays });
+  return parseOrThrow(cleanupRunsResponseSchema, response.data, "cleanup runs");
+}
+
+export async function cleanupAllRuns() {
+  const response = await portalApi.post("/portal/runs/cleanup-all");
+  return parseOrThrow(cleanupAllRunsResponseSchema, response.data, "cleanup all runs");
 }

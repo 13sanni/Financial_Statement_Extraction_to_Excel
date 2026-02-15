@@ -10,7 +10,6 @@ const validationService_1 = require("../services/validationService");
 const appError_1 = require("../utils/appError");
 const geminiExtractionService_1 = require("../services/geminiExtractionService");
 const env_1 = require("../config/env");
-const cloudinaryStorageService_1 = require("../services/cloudinaryStorageService");
 const extractionMetadataService_1 = require("../services/extractionMetadataService");
 const extractionJobService_1 = require("../services/extractionJobService");
 const MAX_TOTAL_UPLOAD_BYTES = 30 * 1024 * 1024;
@@ -63,6 +62,7 @@ async function runIncomeStatementTool(req, res, next) {
             effectiveMode = canUseLlm ? "gemini" : "rule";
         }
         const warnings = new Set();
+        warnings.add("Cloud file hosting is disabled. PDF and hosted Excel links are unavailable.");
         const queuedJobs = await (0, extractionJobService_1.createQueuedJobs)(files.map((file) => ({ runId, requestedMode, file, uploadedBy: actorEmail })));
         const perFileResults = await Promise.all(files.map(async (file, index) => {
             const jobId = queuedJobs[index]?.jobId || (0, crypto_1.randomUUID)();
@@ -89,10 +89,12 @@ async function runIncomeStatementTool(req, res, next) {
                     throw error;
                 }
             }
-            const uploadedPdf = await (0, cloudinaryStorageService_1.uploadRawBufferToCloudinary)(file.buffer, {
-                folderPath: `runs/${runId}/pdfs`,
-                fileName: file.originalname,
-            });
+            const uploadedPdf = {
+                publicId: "",
+                secureUrl: "",
+                bytes: file.size,
+                format: "pdf",
+            };
             return { ...extractionResult, uploadedPdf, file, jobId, fileWarning };
         }));
         const normalizedResults = perFileResults.map((item) => {
@@ -119,10 +121,12 @@ async function runIncomeStatementTool(req, res, next) {
         const allRows = (0, validationService_1.validateStatementRows)(normalizedResults.flatMap((item) => item.rows));
         const metadata = (0, validationService_1.validateStatementMetadata)(normalizedResults.map((item) => item.metadata));
         const excelBuffer = await (0, excelService_1.buildIncomeStatementWorkbook)(allRows, metadata);
-        const uploadedExcel = await (0, cloudinaryStorageService_1.uploadRawBufferToCloudinary)(excelBuffer, {
-            folderPath: `runs/${runId}/outputs`,
-            fileName: `income_statement_${runId}.xlsx`,
-        });
+        const uploadedExcel = {
+            publicId: "",
+            secureUrl: "",
+            bytes: excelBuffer.length,
+            format: "xlsx",
+        };
         await Promise.all(normalizedResults.map((result) => (0, extractionJobService_1.markJobCompleted)({
             jobId: result.jobId,
             years: result.metadata.years,
@@ -130,8 +134,8 @@ async function runIncomeStatementTool(req, res, next) {
             units: result.metadata.units,
             extractedRowCount: result.rows.length,
             warning: result.fileWarning,
-            cloudinaryPublicId: result.uploadedPdf.publicId,
-            cloudinaryUrl: result.uploadedPdf.secureUrl,
+            storagePublicId: result.uploadedPdf.publicId,
+            storageUrl: result.uploadedPdf.secureUrl,
             outputExcelUrl: uploadedExcel.secureUrl,
         })));
         try {
@@ -148,8 +152,8 @@ async function runIncomeStatementTool(req, res, next) {
                     originalName: result.metadata.documentName,
                     mimeType: result.file.mimetype,
                     sizeBytes: result.file.size,
-                    cloudinaryPublicId: result.uploadedPdf.publicId,
-                    cloudinaryUrl: result.uploadedPdf.secureUrl,
+                    storagePublicId: result.uploadedPdf.publicId,
+                    storageUrl: result.uploadedPdf.secureUrl,
                     years: result.metadata.years,
                     currency: result.metadata.currency,
                     units: result.metadata.units,
@@ -158,8 +162,8 @@ async function runIncomeStatementTool(req, res, next) {
                 outputExcel: {
                     fileName: `income_statement_${runId}.xlsx`,
                     sizeBytes: uploadedExcel.bytes,
-                    cloudinaryPublicId: uploadedExcel.publicId,
-                    cloudinaryUrl: uploadedExcel.secureUrl,
+                    storagePublicId: uploadedExcel.publicId,
+                    storageUrl: uploadedExcel.secureUrl,
                 },
             });
         }

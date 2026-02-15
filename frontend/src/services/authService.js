@@ -19,6 +19,29 @@ export function isAuthenticated() {
   return Boolean(getAuthToken());
 }
 
+function decodeJwtPayload(token) {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = atob(normalized);
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
+export function getAuthRole() {
+  const token = getAuthToken();
+  if (!token) return "";
+  const payload = decodeJwtPayload(token);
+  return payload?.role || "";
+}
+
+export function isAdmin() {
+  return getAuthRole() === "admin";
+}
+
 export async function login({ email, password }) {
   const response = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
   const token = response?.data?.token;

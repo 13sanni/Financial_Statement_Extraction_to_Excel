@@ -10,6 +10,9 @@ exports.validatePortalDownloadsQuery = validatePortalDownloadsQuery;
 exports.validatePortalRunJobs = validatePortalRunJobs;
 exports.validatePortalRunIdParam = validatePortalRunIdParam;
 exports.validateDeleteRunResponse = validateDeleteRunResponse;
+exports.validateCleanupRunsBody = validateCleanupRunsBody;
+exports.validateCleanupRunsResponse = validateCleanupRunsResponse;
+exports.validateCleanupAllRunsResponse = validateCleanupAllRunsResponse;
 const zod_1 = require("zod");
 const appError_1 = require("../utils/appError");
 const summaryCardSchema = zod_1.z.object({
@@ -76,7 +79,6 @@ const runJobItemSchema = zod_1.z.object({
     warning: zod_1.z.string(),
     failureReason: zod_1.z.string(),
     updatedAt: zod_1.z.string().min(1),
-    sourcePdfUrl: zod_1.z.string(),
     outputExcelUrl: zod_1.z.string(),
 });
 const runIdParamSchema = zod_1.z.object({
@@ -85,6 +87,19 @@ const runIdParamSchema = zod_1.z.object({
 const deleteRunResponseSchema = zod_1.z.object({
     deleted: zod_1.z.boolean(),
     runId: zod_1.z.string().min(1),
+});
+const cleanupRunsBodySchema = zod_1.z.object({
+    olderThanDays: zod_1.z.coerce.number().int().min(1).max(3650).default(30),
+});
+const cleanupRunsResponseSchema = zod_1.z.object({
+    olderThanDays: zod_1.z.number().int().min(1),
+    cutoffIso: zod_1.z.string().min(1),
+    deletedRuns: zod_1.z.number().int().min(0),
+    deletedJobs: zod_1.z.number().int().min(0),
+});
+const cleanupAllRunsResponseSchema = zod_1.z.object({
+    deletedRuns: zod_1.z.number().int().min(0),
+    deletedJobs: zod_1.z.number().int().min(0),
 });
 function parseOrThrow(schema, data, label) {
     const parsed = schema.safeParse(data);
@@ -123,4 +138,13 @@ function validatePortalRunIdParam(data) {
 }
 function validateDeleteRunResponse(data) {
     return parseOrThrow(deleteRunResponseSchema, data, "delete run response");
+}
+function validateCleanupRunsBody(data) {
+    return parseOrThrow(cleanupRunsBodySchema, data, "cleanup runs body");
+}
+function validateCleanupRunsResponse(data) {
+    return parseOrThrow(cleanupRunsResponseSchema, data, "cleanup runs response");
+}
+function validateCleanupAllRunsResponse(data) {
+    return parseOrThrow(cleanupAllRunsResponseSchema, data, "cleanup all runs response");
 }

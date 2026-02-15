@@ -6,8 +6,9 @@ exports.getPortalUploadQueue = getPortalUploadQueue;
 exports.getPortalRuns = getPortalRuns;
 exports.getPortalDownloads = getPortalDownloads;
 exports.deletePortalRun = deletePortalRun;
+exports.deleteOlderPortalRuns = deleteOlderPortalRuns;
+exports.deleteAllPortalRuns = deleteAllPortalRuns;
 const env_1 = require("../config/env");
-const cloudinary_1 = require("../config/cloudinary");
 const extractionJob_1 = require("../models/extractionJob");
 const extractionRun_1 = require("../models/extractionRun");
 function paginateRows(rows, { page, pageSize }) {
@@ -92,8 +93,8 @@ async function loadJobsFromDb() {
         extractedRowCount: 1,
         warning: 1,
         errorMessage: 1,
-        cloudinaryPublicId: 1,
-        cloudinaryUrl: 1,
+        storagePublicId: 1,
+        storageUrl: 1,
         outputExcelUrl: 1,
         createdAt: 1,
         updatedAt: 1,
@@ -112,7 +113,6 @@ async function getPortalRunJobs(runId) {
         warning: job.warning || "",
         failureReason: job.errorMessage || "",
         updatedAt: formatDateTime(job.updatedAt || job.createdAt),
-        sourcePdfUrl: job.cloudinaryUrl || "",
         outputExcelUrl: job.outputExcelUrl || "",
     }));
     return jobs;
@@ -233,7 +233,7 @@ async function getPortalRuns(options) {
                     completedCount: statusCounts.completedCount || run.uploadedPdfs.length,
                 })
                 : 100,
-            outputExcelUrl: run.outputExcel?.cloudinaryUrl || "",
+            outputExcelUrl: run.outputExcel?.storageUrl || "",
         };
     });
     const activeJobGroups = jobs
@@ -283,13 +283,13 @@ async function getPortalRuns(options) {
 }
 async function getPortalDownloads(options) {
     const downloads = (await loadRunsFromDb())
-        .filter((run) => Boolean(run.outputExcel?.cloudinaryUrl))
+        .filter((run) => Boolean(run.outputExcel?.storageUrl))
         .map((run) => ({
         id: run.runId,
         file: run.outputExcel?.fileName || `income_statement_${run.runId}.xlsx`,
         generatedAt: formatDateTime(run.createdAt),
         size: formatBytes(run.outputExcel?.sizeBytes || 0),
-        downloadUrl: run.outputExcel?.cloudinaryUrl,
+        downloadUrl: run.outputExcel?.storageUrl,
     }));
     const normalizedQuery = options.query.toLowerCase();
     const filtered = downloads
@@ -320,24 +320,59 @@ async function deletePortalRun(runId) {
         extractionRun_1.ExtractionRunModel.updateOne({ runId }, { $set: { deletedAt: now } }),
         extractionJob_1.ExtractionJobModel.updateMany({ runId }, { $set: { deletedAt: now } }),
     ]);
-    // Best effort cleanup in Cloudinary; deletion failures should not fail API call.
-    try {
-        const cloudinary = (0, cloudinary_1.getCloudinary)();
-        const publicIds = new Set();
-        run?.uploadedPdfs.forEach((item) => publicIds.add(item.cloudinaryPublicId));
-        if (run?.outputExcel?.cloudinaryPublicId)
-            publicIds.add(run.outputExcel.cloudinaryPublicId);
-        jobs.forEach((job) => {
-            if (job.cloudinaryPublicId)
-                publicIds.add(job.cloudinaryPublicId);
-        });
-        await Promise.all([...publicIds].map((publicId) => cloudinary.uploader.destroy(publicId, { resource_type: "raw", invalidate: true })));
-    }
-    catch (error) {
-        console.warn(`Cloudinary cleanup failed for run ${runId}`, error);
-    }
     return {
         deleted: true,
         runId,
+    };
+}
+async function deleteOlderPortalRuns(olderThanDays) {
+    if (!(0, env_1.hasMongoConfig)()) {
+        return {
+            olderThanDays,
+            cutoffIso: new Date().toISOString(),
+            deletedRuns: 0,
+            deletedJobs: 0,
+        };
+    }
+    const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
+    const runsToDelete = await extractionRun_1.ExtractionRunModel.find({
+        deletedAt: null,
+        createdAt: { $lt: cutoff },
+    })
+        .select({ runId: 1, _id: 0 })
+        .lean();
+    const runIds = runsToDelete.map((row) => row.runId);
+    if (!runIds.length) {
+        return {
+            olderThanDays,
+            cutoffIso: cutoff.toISOString(),
+            deletedRuns: 0,
+            deletedJobs: 0,
+        };
+    }
+    const now = new Date();
+    const [runUpdate, jobUpdate] = await Promise.all([
+        extractionRun_1.ExtractionRunModel.updateMany({ runId: { $in: runIds }, deletedAt: null }, { $set: { deletedAt: now } }),
+        extractionJob_1.ExtractionJobModel.updateMany({ runId: { $in: runIds }, deletedAt: null }, { $set: { deletedAt: now } }),
+    ]);
+    return {
+        olderThanDays,
+        cutoffIso: cutoff.toISOString(),
+        deletedRuns: runUpdate.modifiedCount || 0,
+        deletedJobs: jobUpdate.modifiedCount || 0,
+    };
+}
+async function deleteAllPortalRuns() {
+    if (!(0, env_1.hasMongoConfig)()) {
+        return { deletedRuns: 0, deletedJobs: 0 };
+    }
+    const now = new Date();
+    const [runUpdate, jobUpdate] = await Promise.all([
+        extractionRun_1.ExtractionRunModel.updateMany({ deletedAt: null }, { $set: { deletedAt: now } }),
+        extractionJob_1.ExtractionJobModel.updateMany({ deletedAt: null }, { $set: { deletedAt: now } }),
+    ]);
+    return {
+        deletedRuns: runUpdate.modifiedCount || 0,
+        deletedJobs: jobUpdate.modifiedCount || 0,
     };
 }

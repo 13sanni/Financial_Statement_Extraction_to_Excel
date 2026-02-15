@@ -1,5 +1,4 @@
 import { hasMongoConfig } from "../config/env";
-import { getCloudinary } from "../config/cloudinary";
 import { ExtractionJobModel } from "../models/extractionJob";
 import { ExtractionRunModel } from "../models/extractionRun";
 
@@ -47,7 +46,6 @@ type RunJobItem = {
   warning: string;
   failureReason: string;
   updatedAt: string;
-  sourcePdfUrl: string;
   outputExcelUrl: string;
 };
 
@@ -89,8 +87,9 @@ type RunRecord = {
     originalName: string;
     extractedRowCount: number;
     years: string[];
+    storageUrl: string;
   }>;
-  outputExcel?: { fileName: string; sizeBytes: number; cloudinaryUrl: string } | undefined;
+  outputExcel?: { fileName: string; sizeBytes: number; storageUrl: string } | undefined;
 };
 
 type JobRecord = {
@@ -103,8 +102,8 @@ type JobRecord = {
   extractedRowCount: number;
   warning: string;
   errorMessage: string;
-  cloudinaryPublicId: string;
-  cloudinaryUrl: string;
+  storagePublicId: string;
+  storageUrl: string;
   outputExcelUrl: string;
   createdAt: Date;
   updatedAt: Date;
@@ -195,8 +194,8 @@ async function loadJobsFromDb(): Promise<JobRecord[]> {
       extractedRowCount: 1,
       warning: 1,
       errorMessage: 1,
-      cloudinaryPublicId: 1,
-      cloudinaryUrl: 1,
+      storagePublicId: 1,
+      storageUrl: 1,
       outputExcelUrl: 1,
       createdAt: 1,
       updatedAt: 1,
@@ -216,7 +215,6 @@ export async function getPortalRunJobs(runId: string): Promise<RunJobItem[]> {
       warning: job.warning || "",
       failureReason: job.errorMessage || "",
       updatedAt: formatDateTime(job.updatedAt || job.createdAt),
-      sourcePdfUrl: job.cloudinaryUrl || "",
       outputExcelUrl: job.outputExcelUrl || "",
     }));
   return jobs;
@@ -349,7 +347,7 @@ export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResu
               completedCount: statusCounts.completedCount || run.uploadedPdfs.length,
             })
           : 100,
-      outputExcelUrl: run.outputExcel?.cloudinaryUrl || "",
+      outputExcelUrl: run.outputExcel?.storageUrl || "",
     };
   });
   const activeJobGroups = jobs
@@ -403,13 +401,13 @@ export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResu
 
 export async function getPortalDownloads(options: DownloadsOptions): Promise<PaginatedResult<DownloadItem>> {
   const downloads: DownloadItem[] = (await loadRunsFromDb())
-    .filter((run) => Boolean(run.outputExcel?.cloudinaryUrl))
+    .filter((run) => Boolean(run.outputExcel?.storageUrl))
     .map((run) => ({
       id: run.runId,
       file: run.outputExcel?.fileName || `income_statement_${run.runId}.xlsx`,
       generatedAt: formatDateTime(run.createdAt),
       size: formatBytes(run.outputExcel?.sizeBytes || 0),
-      downloadUrl: run.outputExcel?.cloudinaryUrl as string,
+      downloadUrl: run.outputExcel?.storageUrl as string,
     }));
 
   const normalizedQuery = options.query.toLowerCase();
@@ -443,27 +441,78 @@ export async function deletePortalRun(runId: string): Promise<{ deleted: boolean
     ExtractionJobModel.updateMany({ runId }, { $set: { deletedAt: now } }),
   ]);
 
-  // Best effort cleanup in Cloudinary; deletion failures should not fail API call.
-  try {
-    const cloudinary = getCloudinary();
-    const publicIds = new Set<string>();
-    run?.uploadedPdfs.forEach((item) => publicIds.add(item.cloudinaryPublicId));
-    if (run?.outputExcel?.cloudinaryPublicId) publicIds.add(run.outputExcel.cloudinaryPublicId);
-    jobs.forEach((job) => {
-      if (job.cloudinaryPublicId) publicIds.add(job.cloudinaryPublicId);
-    });
-
-    await Promise.all(
-      [...publicIds].map((publicId) =>
-        cloudinary.uploader.destroy(publicId, { resource_type: "raw", invalidate: true }),
-      ),
-    );
-  } catch (error) {
-    console.warn(`Cloudinary cleanup failed for run ${runId}`, error);
-  }
-
   return {
     deleted: true,
     runId,
+  };
+}
+
+export async function deleteOlderPortalRuns(olderThanDays: number): Promise<{
+  olderThanDays: number;
+  cutoffIso: string;
+  deletedRuns: number;
+  deletedJobs: number;
+}> {
+  if (!hasMongoConfig()) {
+    return {
+      olderThanDays,
+      cutoffIso: new Date().toISOString(),
+      deletedRuns: 0,
+      deletedJobs: 0,
+    };
+  }
+
+  const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
+  const runsToDelete = await ExtractionRunModel.find({
+    deletedAt: null,
+    createdAt: { $lt: cutoff },
+  })
+    .select({ runId: 1, _id: 0 })
+    .lean<Array<{ runId: string }>>();
+
+  const runIds = runsToDelete.map((row) => row.runId);
+  if (!runIds.length) {
+    return {
+      olderThanDays,
+      cutoffIso: cutoff.toISOString(),
+      deletedRuns: 0,
+      deletedJobs: 0,
+    };
+  }
+
+  const now = new Date();
+  const [runUpdate, jobUpdate] = await Promise.all([
+    ExtractionRunModel.updateMany(
+      { runId: { $in: runIds }, deletedAt: null },
+      { $set: { deletedAt: now } },
+    ),
+    ExtractionJobModel.updateMany(
+      { runId: { $in: runIds }, deletedAt: null },
+      { $set: { deletedAt: now } },
+    ),
+  ]);
+
+  return {
+    olderThanDays,
+    cutoffIso: cutoff.toISOString(),
+    deletedRuns: runUpdate.modifiedCount || 0,
+    deletedJobs: jobUpdate.modifiedCount || 0,
+  };
+}
+
+export async function deleteAllPortalRuns(): Promise<{ deletedRuns: number; deletedJobs: number }> {
+  if (!hasMongoConfig()) {
+    return { deletedRuns: 0, deletedJobs: 0 };
+  }
+
+  const now = new Date();
+  const [runUpdate, jobUpdate] = await Promise.all([
+    ExtractionRunModel.updateMany({ deletedAt: null }, { $set: { deletedAt: now } }),
+    ExtractionJobModel.updateMany({ deletedAt: null }, { $set: { deletedAt: now } }),
+  ]);
+
+  return {
+    deletedRuns: runUpdate.modifiedCount || 0,
+    deletedJobs: jobUpdate.modifiedCount || 0,
   };
 }

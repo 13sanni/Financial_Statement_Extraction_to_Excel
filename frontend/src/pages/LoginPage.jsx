@@ -32,20 +32,20 @@ function LoginPage() {
       subtitle="Sign in to access extraction tools and run data."
     >
       <form onSubmit={handleSubmit}>
-        <label className="mt-4 block text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
+        <label className="mt-4 block text-xs font-semibold uppercase tracking-[0.04em] text-slate-400">
           Email
           <input
-            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
+            className="mt-1 block w-full rounded-lg border border-slate-600 bg-black px-3 py-2 text-sm text-white outline-none ring-white/20 transition focus:border-white focus:ring-4"
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
           />
         </label>
-        <label className="mt-3 block text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
+        <label className="mt-3 block text-xs font-semibold uppercase tracking-[0.04em] text-slate-400">
           Password
           <input
-            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none ring-blue-200 transition focus:border-blue-400 focus:ring-4"
+            className="mt-1 block w-full rounded-lg border border-slate-600 bg-black px-3 py-2 text-sm text-white outline-none ring-white/20 transition focus:border-white focus:ring-4"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
@@ -53,19 +53,21 @@ function LoginPage() {
             required
           />
         </label>
-        {error ? <p className="mt-3 text-sm font-medium text-red-600">{error}</p> : null}
-        {successMessage ? <p className="mt-3 text-sm font-medium text-emerald-700">{successMessage}</p> : null}
+        {error ? <p className="mt-3 text-sm font-medium text-white">{error}</p> : null}
+        {successMessage ? <p className="mt-3 text-sm font-medium text-white">{successMessage}</p> : null}
         <button
           type="submit"
           disabled={isSubmitting}
-          className={`mt-4 w-full rounded-lg px-3 py-2 text-sm font-medium text-white ${
-            isSubmitting ? "cursor-not-allowed bg-slate-400" : "bg-blue-600 hover:bg-blue-700"
+          className={`mt-4 w-full rounded-lg px-3 py-2 text-sm font-semibold ${
+            isSubmitting
+              ? "cursor-not-allowed bg-slate-600 text-slate-300"
+              : "bg-white text-black hover:bg-slate-200"
           }`}
         >
           {isSubmitting ? "Signing in..." : "Sign In"}
         </button>
       </form>
-      <Link className="mt-3 block text-center text-sm font-medium text-blue-700 hover:underline" to="/register">
+      <Link className="mt-3 block text-center text-sm font-medium text-white hover:underline" to="/register">
         Don&apos;t have an account? Register
       </Link>
     </AuthCard>

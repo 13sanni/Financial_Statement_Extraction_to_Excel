@@ -5,8 +5,8 @@ type UploadedPdfRecordInput = {
   originalName: string;
   mimeType: string;
   sizeBytes: number;
-  cloudinaryPublicId: string;
-  cloudinaryUrl: string;
+  storagePublicId: string;
+  storageUrl: string;
   years: string[];
   currency: string;
   units: string;
@@ -16,8 +16,8 @@ type UploadedPdfRecordInput = {
 type OutputExcelRecordInput = {
   fileName: string;
   sizeBytes: number;
-  cloudinaryPublicId: string;
-  cloudinaryUrl: string;
+  storagePublicId: string;
+  storageUrl: string;
 };
 
 type ExtractionRunRecordInput = {

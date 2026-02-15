@@ -27,8 +27,8 @@ async function createQueuedJobs(inputs) {
         extractedRowCount: 0,
         warning: "",
         errorMessage: "",
-        cloudinaryPublicId: "",
-        cloudinaryUrl: "",
+        storagePublicId: "",
+        storageUrl: "",
         outputExcelUrl: "",
     }));
     const created = await extractionJob_1.ExtractionJobModel.insertMany(docs);
@@ -50,8 +50,8 @@ async function markJobCompleted(input) {
             units: input.units,
             extractedRowCount: input.extractedRowCount,
             warning: input.warning || "",
-            cloudinaryPublicId: input.cloudinaryPublicId,
-            cloudinaryUrl: input.cloudinaryUrl,
+            storagePublicId: input.storagePublicId,
+            storageUrl: input.storageUrl,
             outputExcelUrl: input.outputExcelUrl,
             completedAt: new Date(),
         },

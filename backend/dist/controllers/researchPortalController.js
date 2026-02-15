@@ -6,6 +6,8 @@ exports.getRuns = getRuns;
 exports.getDownloads = getDownloads;
 exports.getRunJobs = getRunJobs;
 exports.deleteRun = deleteRun;
+exports.cleanupOldRuns = cleanupOldRuns;
+exports.cleanupAllRuns = cleanupAllRuns;
 const researchPortalService_1 = require("../services/researchPortalService");
 const researchPortalValidationService_1 = require("../services/researchPortalValidationService");
 async function getSummary(_req, res, next) {
@@ -56,6 +58,23 @@ async function deleteRun(req, res, next) {
     try {
         const { runId } = (0, researchPortalValidationService_1.validatePortalRunIdParam)(req.params);
         res.json((0, researchPortalValidationService_1.validateDeleteRunResponse)(await (0, researchPortalService_1.deletePortalRun)(runId)));
+    }
+    catch (error) {
+        next(error);
+    }
+}
+async function cleanupOldRuns(req, res, next) {
+    try {
+        const { olderThanDays } = (0, researchPortalValidationService_1.validateCleanupRunsBody)(req.body || {});
+        res.json((0, researchPortalValidationService_1.validateCleanupRunsResponse)(await (0, researchPortalService_1.deleteOlderPortalRuns)(olderThanDays)));
+    }
+    catch (error) {
+        next(error);
+    }
+}
+async function cleanupAllRuns(_req, res, next) {
+    try {
+        res.json((0, researchPortalValidationService_1.validateCleanupAllRunsResponse)(await (0, researchPortalService_1.deleteAllPortalRuns)()));
     }
     catch (error) {
         next(error);

@@ -4,8 +4,8 @@ type UploadedPdfMetadata = {
   originalName: string;
   mimeType: string;
   sizeBytes: number;
-  cloudinaryPublicId: string;
-  cloudinaryUrl: string;
+  storagePublicId: string;
+  storageUrl: string;
   years: string[];
   currency: string;
   units: string;
@@ -15,8 +15,8 @@ type UploadedPdfMetadata = {
 type OutputExcelMetadata = {
   fileName: string;
   sizeBytes: number;
-  cloudinaryPublicId: string;
-  cloudinaryUrl: string;
+  storagePublicId: string;
+  storageUrl: string;
 };
 
 export type ExtractionRunDocument = {
@@ -40,8 +40,8 @@ const uploadedPdfSchema = new Schema<UploadedPdfMetadata>(
     originalName: { type: String, required: true },
     mimeType: { type: String, required: true },
     sizeBytes: { type: Number, required: true },
-    cloudinaryPublicId: { type: String, required: true },
-    cloudinaryUrl: { type: String, required: true },
+    storagePublicId: { type: String, required: true },
+    storageUrl: { type: String, required: true },
     years: [{ type: String, required: true }],
     currency: { type: String, required: true },
     units: { type: String, required: true },
@@ -54,8 +54,8 @@ const outputExcelSchema = new Schema<OutputExcelMetadata>(
   {
     fileName: { type: String, required: true },
     sizeBytes: { type: Number, required: true },
-    cloudinaryPublicId: { type: String, required: true },
-    cloudinaryUrl: { type: String, required: true },
+    storagePublicId: { type: String, required: true },
+    storageUrl: { type: String, required: true },
   },
   { _id: false },
 );

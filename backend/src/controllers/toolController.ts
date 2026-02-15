@@ -13,7 +13,6 @@ import { StatementMetadata, StatementRow } from "../types/statement";
 import { AppError } from "../utils/appError";
 import { extractWithGemini } from "../services/geminiExtractionService";
 import { hasGeminiConfig } from "../config/env";
-import { uploadRawBufferToCloudinary } from "../services/cloudinaryStorageService";
 import { saveExtractionRunMetadata } from "../services/extractionMetadataService";
 import {
   createQueuedJobs,
@@ -84,6 +83,7 @@ export async function runIncomeStatementTool(
     }
 
     const warnings = new Set<string>();
+    warnings.add("Cloud file hosting is disabled. PDF and hosted Excel links are unavailable.");
     const queuedJobs = await createQueuedJobs(
       files.map((file) => ({ runId, requestedMode, file, uploadedBy: actorEmail })),
     );
@@ -112,10 +112,12 @@ export async function runIncomeStatementTool(
           }
         }
 
-        const uploadedPdf = await uploadRawBufferToCloudinary(file.buffer, {
-          folderPath: `runs/${runId}/pdfs`,
-          fileName: file.originalname,
-        });
+        const uploadedPdf = {
+          publicId: "",
+          secureUrl: "",
+          bytes: file.size,
+          format: "pdf",
+        };
 
         return { ...extractionResult, uploadedPdf, file, jobId, fileWarning };
       }),
@@ -146,10 +148,12 @@ export async function runIncomeStatementTool(
     const metadata = validateStatementMetadata(normalizedResults.map((item) => item.metadata));
 
     const excelBuffer = await buildIncomeStatementWorkbook(allRows, metadata);
-    const uploadedExcel = await uploadRawBufferToCloudinary(excelBuffer, {
-      folderPath: `runs/${runId}/outputs`,
-      fileName: `income_statement_${runId}.xlsx`,
-    });
+    const uploadedExcel = {
+      publicId: "",
+      secureUrl: "",
+      bytes: excelBuffer.length,
+      format: "xlsx",
+    };
 
     await Promise.all(
       normalizedResults.map((result) =>
@@ -160,8 +164,8 @@ export async function runIncomeStatementTool(
           units: result.metadata.units,
           extractedRowCount: result.rows.length,
           warning: result.fileWarning,
-          cloudinaryPublicId: result.uploadedPdf.publicId,
-          cloudinaryUrl: result.uploadedPdf.secureUrl,
+          storagePublicId: result.uploadedPdf.publicId,
+          storageUrl: result.uploadedPdf.secureUrl,
           outputExcelUrl: uploadedExcel.secureUrl,
         }),
       ),
@@ -181,8 +185,8 @@ export async function runIncomeStatementTool(
           originalName: result.metadata.documentName,
           mimeType: result.file.mimetype,
           sizeBytes: result.file.size,
-          cloudinaryPublicId: result.uploadedPdf.publicId,
-          cloudinaryUrl: result.uploadedPdf.secureUrl,
+          storagePublicId: result.uploadedPdf.publicId,
+          storageUrl: result.uploadedPdf.secureUrl,
           years: result.metadata.years,
           currency: result.metadata.currency,
           units: result.metadata.units,
@@ -191,8 +195,8 @@ export async function runIncomeStatementTool(
         outputExcel: {
           fileName: `income_statement_${runId}.xlsx`,
           sizeBytes: uploadedExcel.bytes,
-          cloudinaryPublicId: uploadedExcel.publicId,
-          cloudinaryUrl: uploadedExcel.secureUrl,
+          storagePublicId: uploadedExcel.publicId,
+          storageUrl: uploadedExcel.secureUrl,
         },
       });
     } catch (error) {

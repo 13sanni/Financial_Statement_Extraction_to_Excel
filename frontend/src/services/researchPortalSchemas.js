@@ -59,7 +59,6 @@ export const runJobsResponseSchema = z.array(
     warning: z.string(),
     failureReason: z.string(),
     updatedAt: z.string().min(1),
-    sourcePdfUrl: z.string(),
     outputExcelUrl: z.string(),
   }),
 );
@@ -67,4 +66,16 @@ export const runJobsResponseSchema = z.array(
 export const deleteRunResponseSchema = z.object({
   deleted: z.boolean(),
   runId: z.string().min(1),
+});
+
+export const cleanupRunsResponseSchema = z.object({
+  olderThanDays: z.number().int().min(1),
+  cutoffIso: z.string().min(1),
+  deletedRuns: z.number().int().min(0),
+  deletedJobs: z.number().int().min(0),
+});
+
+export const cleanupAllRunsResponseSchema = z.object({
+  deletedRuns: z.number().int().min(0),
+  deletedJobs: z.number().int().min(0),
 });

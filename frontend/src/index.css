@@ -2,10 +2,18 @@
 
 @layer base {
   body {
-    @apply m-0 min-h-screen min-w-80 bg-[radial-gradient(circle_at_top_left,#eef4ff_0%,#f4f7fb_60%)] font-sans leading-relaxed text-slate-900;
+    font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+    @apply m-0 min-h-screen min-w-80 bg-black leading-relaxed text-white;
   }
 
   #root {
     @apply min-h-screen;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: "Sora", "Manrope", ui-sans-serif, system-ui, sans-serif;
   }
 }

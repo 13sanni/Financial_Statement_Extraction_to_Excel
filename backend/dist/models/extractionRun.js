@@ -6,8 +6,8 @@ const uploadedPdfSchema = new mongoose_1.Schema({
     originalName: { type: String, required: true },
     mimeType: { type: String, required: true },
     sizeBytes: { type: Number, required: true },
-    cloudinaryPublicId: { type: String, required: true },
-    cloudinaryUrl: { type: String, required: true },
+    storagePublicId: { type: String, required: true },
+    storageUrl: { type: String, required: true },
     years: [{ type: String, required: true }],
     currency: { type: String, required: true },
     units: { type: String, required: true },
@@ -16,8 +16,8 @@ const uploadedPdfSchema = new mongoose_1.Schema({
 const outputExcelSchema = new mongoose_1.Schema({
     fileName: { type: String, required: true },
     sizeBytes: { type: Number, required: true },
-    cloudinaryPublicId: { type: String, required: true },
-    cloudinaryUrl: { type: String, required: true },
+    storagePublicId: { type: String, required: true },
+    storageUrl: { type: String, required: true },
 }, { _id: false });
 const extractionRunSchema = new mongoose_1.Schema({
     runId: { type: String, required: true, unique: true },

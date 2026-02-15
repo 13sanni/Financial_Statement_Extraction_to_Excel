@@ -1,6 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 import {
+  deleteAllPortalRuns,
   deletePortalRun,
+  deleteOlderPortalRuns,
   getPortalDownloads,
   getPortalRunJobs,
   getPortalRuns,
@@ -8,6 +10,9 @@ import {
   getPortalUploadQueue,
 } from "../services/researchPortalService";
 import {
+  validateCleanupRunsBody,
+  validateCleanupAllRunsResponse,
+  validateCleanupRunsResponse,
   validateDeleteRunResponse,
   validatePortalDownloads,
   validatePortalDownloadsQuery,
@@ -68,6 +73,23 @@ export async function deleteRun(req: Request, res: Response, next: NextFunction)
   try {
     const { runId } = validatePortalRunIdParam(req.params);
     res.json(validateDeleteRunResponse(await deletePortalRun(runId)));
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function cleanupOldRuns(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { olderThanDays } = validateCleanupRunsBody(req.body || {});
+    res.json(validateCleanupRunsResponse(await deleteOlderPortalRuns(olderThanDays)));
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function cleanupAllRuns(_req: Request, res: Response, next: NextFunction) {
+  try {
+    res.json(validateCleanupAllRunsResponse(await deleteAllPortalRuns()));
   } catch (error) {
     next(error);
   }
