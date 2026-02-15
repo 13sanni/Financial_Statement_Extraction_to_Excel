@@ -21,6 +21,7 @@ const outputExcelSchema = new mongoose_1.Schema({
 }, { _id: false });
 const extractionRunSchema = new mongoose_1.Schema({
     runId: { type: String, required: true, unique: true },
+    createdBy: { type: String, required: true, default: "System" },
     requestedMode: { type: String, required: true, enum: ["auto", "gemini", "rule"] },
     effectiveMode: { type: String, required: true, enum: ["auto", "gemini", "rule"] },
     status: { type: String, required: true, enum: ["completed", "failed"] },
@@ -29,6 +30,7 @@ const extractionRunSchema = new mongoose_1.Schema({
     totalUploadBytes: { type: Number, required: true },
     uploadedPdfs: { type: [uploadedPdfSchema], required: true },
     outputExcel: { type: outputExcelSchema, required: false },
+    deletedAt: { type: Date, required: false, default: null },
 }, { timestamps: true });
 const existingModel = mongoose_1.models.ExtractionRun;
 exports.ExtractionRunModel = existingModel || (0, mongoose_1.model)("ExtractionRun", extractionRunSchema);

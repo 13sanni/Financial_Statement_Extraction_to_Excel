@@ -7,6 +7,7 @@ exports.env = void 0;
 exports.hasGeminiConfig = hasGeminiConfig;
 exports.hasMongoConfig = hasMongoConfig;
 exports.hasCloudinaryConfig = hasCloudinaryConfig;
+exports.hasJwtConfig = hasJwtConfig;
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 exports.env = {
@@ -17,6 +18,11 @@ exports.env = {
     cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || "",
     cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || "",
     cloudinaryFolder: process.env.CLOUDINARY_FOLDER || "financial-statement-extraction",
+    jwtSecret: process.env.JWT_SECRET || "",
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || "12h",
+    corsOrigin: process.env.CORS_ORIGIN || "",
+    adminEmail: process.env.ADMIN_EMAIL || "",
+    adminPassword: process.env.ADMIN_PASSWORD || "",
 };
 function hasGeminiConfig() {
     return Boolean(exports.env.geminiApiKey);
@@ -26,4 +32,7 @@ function hasMongoConfig() {
 }
 function hasCloudinaryConfig() {
     return Boolean(exports.env.cloudinaryCloudName && exports.env.cloudinaryApiKey && exports.env.cloudinaryApiSecret);
+}
+function hasJwtConfig() {
+    return Boolean(exports.env.jwtSecret);
 }

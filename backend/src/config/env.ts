@@ -10,6 +10,11 @@ export const env = {
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || "",
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || "",
   cloudinaryFolder: process.env.CLOUDINARY_FOLDER || "financial-statement-extraction",
+  jwtSecret: process.env.JWT_SECRET || "",
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || "12h",
+  corsOrigin: process.env.CORS_ORIGIN || "",
+  adminEmail: process.env.ADMIN_EMAIL || "",
+  adminPassword: process.env.ADMIN_PASSWORD || "",
 };
 
 export function hasGeminiConfig(): boolean {
@@ -22,4 +27,8 @@ export function hasMongoConfig(): boolean {
 
 export function hasCloudinaryConfig(): boolean {
   return Boolean(env.cloudinaryCloudName && env.cloudinaryApiKey && env.cloudinaryApiSecret);
+}
+
+export function hasJwtConfig(): boolean {
+  return Boolean(env.jwtSecret);
 }

@@ -7,6 +7,7 @@ exports.getPortalRuns = getPortalRuns;
 exports.getPortalDownloads = getPortalDownloads;
 exports.deletePortalRun = deletePortalRun;
 const env_1 = require("../config/env");
+const cloudinary_1 = require("../config/cloudinary");
 const extractionJob_1 = require("../models/extractionJob");
 const extractionRun_1 = require("../models/extractionRun");
 function paginateRows(rows, { page, pageSize }) {
@@ -62,7 +63,7 @@ function calculateRunConfidencePercent(run) {
 async function loadRunsFromDb() {
     if (!(0, env_1.hasMongoConfig)())
         return [];
-    const rows = await extractionRun_1.ExtractionRunModel.find()
+    const rows = await extractionRun_1.ExtractionRunModel.find({ deletedAt: null })
         .sort({ createdAt: -1 })
         .select({
         runId: 1,
@@ -79,7 +80,7 @@ async function loadRunsFromDb() {
 async function loadJobsFromDb() {
     if (!(0, env_1.hasMongoConfig)())
         return [];
-    const rows = await extractionJob_1.ExtractionJobModel.find()
+    const rows = await extractionJob_1.ExtractionJobModel.find({ deletedAt: null })
         .sort({ createdAt: -1 })
         .select({
         jobId: 1,
@@ -91,6 +92,7 @@ async function loadJobsFromDb() {
         extractedRowCount: 1,
         warning: 1,
         errorMessage: 1,
+        cloudinaryPublicId: 1,
         cloudinaryUrl: 1,
         outputExcelUrl: 1,
         createdAt: 1,
@@ -309,12 +311,33 @@ async function deletePortalRun(runId) {
     if (!(0, env_1.hasMongoConfig)()) {
         return { deleted: false, runId };
     }
-    const [runResult, jobsResult] = await Promise.all([
-        extractionRun_1.ExtractionRunModel.deleteOne({ runId }),
-        extractionJob_1.ExtractionJobModel.deleteMany({ runId }),
+    const run = await extractionRun_1.ExtractionRunModel.findOne({ runId, deletedAt: null });
+    const jobs = await extractionJob_1.ExtractionJobModel.find({ runId, deletedAt: null }).lean();
+    if (!run && !jobs.length)
+        return { deleted: false, runId };
+    const now = new Date();
+    await Promise.all([
+        extractionRun_1.ExtractionRunModel.updateOne({ runId }, { $set: { deletedAt: now } }),
+        extractionJob_1.ExtractionJobModel.updateMany({ runId }, { $set: { deletedAt: now } }),
     ]);
+    // Best effort cleanup in Cloudinary; deletion failures should not fail API call.
+    try {
+        const cloudinary = (0, cloudinary_1.getCloudinary)();
+        const publicIds = new Set();
+        run?.uploadedPdfs.forEach((item) => publicIds.add(item.cloudinaryPublicId));
+        if (run?.outputExcel?.cloudinaryPublicId)
+            publicIds.add(run.outputExcel.cloudinaryPublicId);
+        jobs.forEach((job) => {
+            if (job.cloudinaryPublicId)
+                publicIds.add(job.cloudinaryPublicId);
+        });
+        await Promise.all([...publicIds].map((publicId) => cloudinary.uploader.destroy(publicId, { resource_type: "raw", invalidate: true })));
+    }
+    catch (error) {
+        console.warn(`Cloudinary cleanup failed for run ${runId}`, error);
+    }
     return {
-        deleted: runResult.deletedCount > 0 || jobsResult.deletedCount > 0,
+        deleted: true,
         runId,
     };
 }

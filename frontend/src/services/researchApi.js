@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "../config/env";
+import { getAuthToken } from "./authService";
 
 export async function runIncomeStatementExtraction({ files, mode = "auto" }) {
   const formData = new FormData();
@@ -8,6 +9,9 @@ export async function runIncomeStatementExtraction({ files, mode = "auto" }) {
     `${API_BASE_URL}/tools/income-statement?mode=${encodeURIComponent(mode)}`,
     {
       method: "POST",
+      headers: {
+        Authorization: `Bearer ${getAuthToken()}`,
+      },
       body: formData,
     },
   );

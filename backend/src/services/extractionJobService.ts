@@ -6,6 +6,7 @@ type QueuedJobInput = {
   runId: string;
   requestedMode: "auto" | "gemini" | "rule";
   file: Express.Multer.File;
+  uploadedBy: string;
 };
 
 type CompleteJobInput = {
@@ -31,7 +32,7 @@ export async function createQueuedJobs(inputs: QueuedJobInput[]): Promise<Array<
     originalName: input.file.originalname,
     mimeType: input.file.mimetype,
     sizeBytes: input.file.size,
-    uploadedBy: "System",
+    uploadedBy: input.uploadedBy,
     requestedMode: input.requestedMode,
     status: "queued" as const,
     years: [],

@@ -63,6 +63,7 @@ export async function runIncomeStatementTool(
   try {
     const files = (req.files as Express.Multer.File[]) || [];
     runId = randomUUID();
+    const actorEmail = req.user?.email || "System";
     const requestedMode = parseMode(req.query.mode);
     const canUseLlm = hasGeminiConfig();
     if (!files.length) {
@@ -84,7 +85,7 @@ export async function runIncomeStatementTool(
 
     const warnings = new Set<string>();
     const queuedJobs = await createQueuedJobs(
-      files.map((file) => ({ runId, requestedMode, file })),
+      files.map((file) => ({ runId, requestedMode, file, uploadedBy: actorEmail })),
     );
     const perFileResults = await Promise.all(
       files.map(async (file, index) => {
@@ -169,6 +170,7 @@ export async function runIncomeStatementTool(
     try {
       await saveExtractionRunMetadata({
         runId,
+        createdBy: actorEmail,
         requestedMode,
         effectiveMode,
         status: "completed",

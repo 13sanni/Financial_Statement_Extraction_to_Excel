@@ -21,6 +21,7 @@ type OutputExcelMetadata = {
 
 export type ExtractionRunDocument = {
   runId: string;
+  createdBy: string;
   requestedMode: "auto" | "gemini" | "rule";
   effectiveMode: "auto" | "gemini" | "rule";
   status: "completed" | "failed";
@@ -31,6 +32,7 @@ export type ExtractionRunDocument = {
   outputExcel?: OutputExcelMetadata;
   createdAt: Date;
   updatedAt: Date;
+  deletedAt?: Date;
 };
 
 const uploadedPdfSchema = new Schema<UploadedPdfMetadata>(
@@ -61,6 +63,7 @@ const outputExcelSchema = new Schema<OutputExcelMetadata>(
 const extractionRunSchema = new Schema<ExtractionRunDocument>(
   {
     runId: { type: String, required: true, unique: true },
+    createdBy: { type: String, required: true, default: "System" },
     requestedMode: { type: String, required: true, enum: ["auto", "gemini", "rule"] },
     effectiveMode: { type: String, required: true, enum: ["auto", "gemini", "rule"] },
     status: { type: String, required: true, enum: ["completed", "failed"] },
@@ -69,6 +72,7 @@ const extractionRunSchema = new Schema<ExtractionRunDocument>(
     totalUploadBytes: { type: Number, required: true },
     uploadedPdfs: { type: [uploadedPdfSchema], required: true },
     outputExcel: { type: outputExcelSchema, required: false },
+    deletedAt: { type: Date, required: false, default: null },
   },
   { timestamps: true },
 );

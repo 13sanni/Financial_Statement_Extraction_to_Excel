@@ -22,6 +22,7 @@ const extractionJobSchema = new mongoose_1.Schema({
     outputExcelUrl: { type: String, required: true, default: "" },
     startedAt: { type: Date, required: false },
     completedAt: { type: Date, required: false },
+    deletedAt: { type: Date, required: false, default: null },
 }, { timestamps: true });
 const existingModel = mongoose_1.models.ExtractionJob;
 exports.ExtractionJobModel = existingModel || (0, mongoose_1.model)("ExtractionJob", extractionJobSchema);

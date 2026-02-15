@@ -22,6 +22,7 @@ type OutputExcelRecordInput = {
 
 type ExtractionRunRecordInput = {
   runId: string;
+  createdBy: string;
   requestedMode: "auto" | "gemini" | "rule";
   effectiveMode: "auto" | "gemini" | "rule";
   status: "completed" | "failed";

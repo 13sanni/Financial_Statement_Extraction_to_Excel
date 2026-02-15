@@ -18,7 +18,7 @@ async function createQueuedJobs(inputs) {
         originalName: input.file.originalname,
         mimeType: input.file.mimetype,
         sizeBytes: input.file.size,
-        uploadedBy: "System",
+        uploadedBy: input.uploadedBy,
         requestedMode: input.requestedMode,
         status: "queued",
         years: [],

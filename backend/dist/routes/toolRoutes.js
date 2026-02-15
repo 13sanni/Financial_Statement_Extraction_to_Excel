@@ -2,14 +2,16 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const researchPortalController_1 = require("../controllers/researchPortalController");
+const authMiddleware_1 = require("../middleware/authMiddleware");
 const toolController_1 = require("../controllers/toolController");
 const uploadMiddleware_1 = require("../middleware/uploadMiddleware");
 const router = (0, express_1.Router)();
+router.use(authMiddleware_1.requireAuth);
 router.get("/portal/summary", researchPortalController_1.getSummary);
 router.get("/portal/upload-queue", researchPortalController_1.getUploadQueue);
 router.get("/portal/runs", researchPortalController_1.getRuns);
 router.get("/portal/runs/:runId/jobs", researchPortalController_1.getRunJobs);
-router.delete("/portal/runs/:runId", researchPortalController_1.deleteRun);
+router.delete("/portal/runs/:runId", authMiddleware_1.requireAdmin, researchPortalController_1.deleteRun);
 router.get("/portal/downloads", researchPortalController_1.getDownloads);
 router.post("/upload", uploadMiddleware_1.upload.array("files", 10), toolController_1.uploadMetadata);
 router.post("/tools/income-statement", uploadMiddleware_1.upload.array("documents", 10), toolController_1.runIncomeStatementTool);

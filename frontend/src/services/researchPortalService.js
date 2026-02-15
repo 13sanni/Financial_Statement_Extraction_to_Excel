@@ -1,5 +1,6 @@
 import axios from "axios";
 import { API_BASE_URL } from "../config/env";
+import { getAuthToken } from "./authService";
 import {
   deleteRunResponseSchema,
   downloadsResponseSchema,
@@ -11,6 +12,15 @@ import {
 
 const portalApi = axios.create({
   baseURL: API_BASE_URL,
+});
+
+portalApi.interceptors.request.use((config) => {
+  const token = getAuthToken();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 function parseOrThrow(schema, data, label) {

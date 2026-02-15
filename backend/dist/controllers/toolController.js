@@ -45,6 +45,7 @@ async function runIncomeStatementTool(req, res, next) {
     try {
         const files = req.files || [];
         runId = (0, crypto_1.randomUUID)();
+        const actorEmail = req.user?.email || "System";
         const requestedMode = parseMode(req.query.mode);
         const canUseLlm = (0, env_1.hasGeminiConfig)();
         if (!files.length) {
@@ -62,7 +63,7 @@ async function runIncomeStatementTool(req, res, next) {
             effectiveMode = canUseLlm ? "gemini" : "rule";
         }
         const warnings = new Set();
-        const queuedJobs = await (0, extractionJobService_1.createQueuedJobs)(files.map((file) => ({ runId, requestedMode, file })));
+        const queuedJobs = await (0, extractionJobService_1.createQueuedJobs)(files.map((file) => ({ runId, requestedMode, file, uploadedBy: actorEmail })));
         const perFileResults = await Promise.all(files.map(async (file, index) => {
             const jobId = queuedJobs[index]?.jobId || (0, crypto_1.randomUUID)();
             let fileWarning = "";
@@ -136,6 +137,7 @@ async function runIncomeStatementTool(req, res, next) {
         try {
             await (0, extractionMetadataService_1.saveExtractionRunMetadata)({
                 runId,
+                createdBy: actorEmail,
                 requestedMode,
                 effectiveMode,
                 status: "completed",

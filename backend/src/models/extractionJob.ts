@@ -24,6 +24,7 @@ export type ExtractionJobDocument = {
   updatedAt: Date;
   startedAt?: Date;
   completedAt?: Date;
+  deletedAt?: Date;
 };
 
 const extractionJobSchema = new Schema<ExtractionJobDocument>(
@@ -47,6 +48,7 @@ const extractionJobSchema = new Schema<ExtractionJobDocument>(
     outputExcelUrl: { type: String, required: true, default: "" },
     startedAt: { type: Date, required: false },
     completedAt: { type: Date, required: false },
+    deletedAt: { type: Date, required: false, default: null },
   },
   { timestamps: true },
 );
