@@ -23,9 +23,11 @@ type RunItem = {
 };
 
 type DownloadItem = {
+  id: string;
   file: string;
   generatedAt: string;
   size: string;
+  downloadUrl: string;
 };
 
 type PaginationOptions = {
@@ -66,7 +68,7 @@ type RunRecord = {
     extractedRowCount: number;
     years: string[];
   }>;
-  outputExcel?: { fileName: string; sizeBytes: number } | undefined;
+  outputExcel?: { fileName: string; sizeBytes: number; cloudinaryUrl: string } | undefined;
 };
 
 function paginateRows<T>(rows: T[], { page, pageSize }: PaginationOptions): PaginatedResult<T> {
@@ -222,11 +224,13 @@ export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResu
 
 export async function getPortalDownloads(options: DownloadsOptions): Promise<PaginatedResult<DownloadItem>> {
   const downloads: DownloadItem[] = (await loadRunsFromDb())
-    .filter((run) => Boolean(run.outputExcel))
+    .filter((run) => Boolean(run.outputExcel?.cloudinaryUrl))
     .map((run) => ({
+      id: run.runId,
       file: run.outputExcel?.fileName || `income_statement_${run.runId}.xlsx`,
       generatedAt: formatDateTime(run.createdAt),
       size: formatBytes(run.outputExcel?.sizeBytes || 0),
+      downloadUrl: run.outputExcel?.cloudinaryUrl as string,
     }));
 
   const normalizedQuery = options.query.toLowerCase();

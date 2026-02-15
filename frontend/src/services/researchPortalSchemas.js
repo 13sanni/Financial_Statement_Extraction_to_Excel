@@ -22,9 +22,11 @@ const runItemSchema = z.object({
 });
 
 const downloadItemSchema = z.object({
+  id: z.string().min(1),
   file: z.string().min(1),
   generatedAt: z.string().min(1),
   size: z.string().min(1),
+  downloadUrl: z.string().url(),
 });
 
 const paginatedResponseSchema = (itemSchema) =>

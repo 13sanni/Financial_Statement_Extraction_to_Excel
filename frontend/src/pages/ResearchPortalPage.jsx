@@ -354,7 +354,7 @@ function ResearchPortalPage() {
           <ul className="grid gap-3">
             {downloads.items.map((download) => (
               <li
-                key={download.file}
+                key={download.id}
                 className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
@@ -365,7 +365,7 @@ function ResearchPortalPage() {
                   <span className="text-sm text-slate-700">{download.size}</span>
                   <Button
                     variant="ghost"
-                    onClick={() => handleAction(`Download clicked: ${download.file}`)}
+                    onClick={() => window.open(download.downloadUrl, "_blank", "noopener,noreferrer")}
                   >
                     Download
                   </Button>

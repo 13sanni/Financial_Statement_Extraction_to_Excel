@@ -28,9 +28,11 @@ const runItemSchema = zod_1.z.object({
     confidence: zod_1.z.string().min(1),
 });
 const downloadItemSchema = zod_1.z.object({
+    id: zod_1.z.string().min(1),
     file: zod_1.z.string().min(1),
     generatedAt: zod_1.z.string().min(1),
     size: zod_1.z.string().min(1),
+    downloadUrl: zod_1.z.string().url(),
 });
 const paginatedResponseSchema = (itemSchema) => zod_1.z.object({
     items: zod_1.z.array(itemSchema),

@@ -147,11 +147,13 @@ async function getPortalRuns(options) {
 }
 async function getPortalDownloads(options) {
     const downloads = (await loadRunsFromDb())
-        .filter((run) => Boolean(run.outputExcel))
+        .filter((run) => Boolean(run.outputExcel?.cloudinaryUrl))
         .map((run) => ({
+        id: run.runId,
         file: run.outputExcel?.fileName || `income_statement_${run.runId}.xlsx`,
         generatedAt: formatDateTime(run.createdAt),
         size: formatBytes(run.outputExcel?.sizeBytes || 0),
+        downloadUrl: run.outputExcel?.cloudinaryUrl,
     }));
     const normalizedQuery = options.query.toLowerCase();
     const filtered = downloads
