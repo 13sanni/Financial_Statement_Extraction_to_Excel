@@ -15,6 +15,13 @@ import { extractWithGemini } from "../services/geminiExtractionService";
 import { hasGeminiConfig } from "../config/env";
 import { uploadRawBufferToCloudinary } from "../services/cloudinaryStorageService";
 import { saveExtractionRunMetadata } from "../services/extractionMetadataService";
+import {
+  createQueuedJobs,
+  markJobCompleted,
+  markJobFailed,
+  markJobProcessing,
+  markRemainingJobsFailed,
+} from "../services/extractionJobService";
 
 const MAX_TOTAL_UPLOAD_BYTES = 30 * 1024 * 1024;
 type ExtractionMode = "auto" | "gemini" | "rule";
@@ -52,9 +59,10 @@ export async function runIncomeStatementTool(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
+  let runId = "";
   try {
     const files = (req.files as Express.Multer.File[]) || [];
-    const runId = randomUUID();
+    runId = randomUUID();
     const requestedMode = parseMode(req.query.mode);
     const canUseLlm = hasGeminiConfig();
     if (!files.length) {
@@ -75,8 +83,15 @@ export async function runIncomeStatementTool(
     }
 
     const warnings = new Set<string>();
+    const queuedJobs = await createQueuedJobs(
+      files.map((file) => ({ runId, requestedMode, file })),
+    );
     const perFileResults = await Promise.all(
-      files.map(async (file) => {
+      files.map(async (file, index) => {
+        const jobId = queuedJobs[index]?.jobId || randomUUID();
+        let fileWarning = "";
+        await markJobProcessing(jobId);
+
         let extractionResult: { rows: StatementRow[]; metadata: StatementMetadata };
         try {
           if (effectiveMode === "gemini") {
@@ -86,11 +101,12 @@ export async function runIncomeStatementTool(
           }
         } catch (error) {
           if (effectiveMode === "gemini" && requestedMode === "auto") {
-            warnings.add(
-              `Gemini extraction failed for ${file.originalname}; fallback to rule extraction.`,
-            );
+            fileWarning = `Gemini extraction failed for ${file.originalname}; fallback to rule extraction.`;
+            warnings.add(fileWarning);
             extractionResult = await extractWithRules(file);
           } else {
+            const errorMessage = error instanceof Error ? error.message : "Extraction failed.";
+            await markJobFailed(jobId, errorMessage);
             throw error;
           }
         }
@@ -100,7 +116,7 @@ export async function runIncomeStatementTool(
           fileName: file.originalname,
         });
 
-        return { ...extractionResult, uploadedPdf, file };
+        return { ...extractionResult, uploadedPdf, file, jobId, fileWarning };
       }),
     );
 
@@ -110,6 +126,8 @@ export async function runIncomeStatementTool(
         file: item.file,
         uploadedPdf: item.uploadedPdf,
         metadata: item.metadata,
+        jobId: item.jobId,
+        fileWarning: item.fileWarning,
         rows: [
           {
             documentName: item.metadata.documentName,
@@ -131,6 +149,22 @@ export async function runIncomeStatementTool(
       folderPath: `runs/${runId}/outputs`,
       fileName: `income_statement_${runId}.xlsx`,
     });
+
+    await Promise.all(
+      normalizedResults.map((result) =>
+        markJobCompleted({
+          jobId: result.jobId,
+          years: result.metadata.years,
+          currency: result.metadata.currency,
+          units: result.metadata.units,
+          extractedRowCount: result.rows.length,
+          warning: result.fileWarning,
+          cloudinaryPublicId: result.uploadedPdf.publicId,
+          cloudinaryUrl: result.uploadedPdf.secureUrl,
+          outputExcelUrl: uploadedExcel.secureUrl,
+        }),
+      ),
+    );
 
     try {
       await saveExtractionRunMetadata({
@@ -177,6 +211,10 @@ export async function runIncomeStatementTool(
     }
     res.send(excelBuffer);
   } catch (error) {
+    if (runId) {
+      const message = error instanceof Error ? error.message : "Extraction failed.";
+      await markRemainingJobsFailed(runId, message);
+    }
     next(error);
   }
 }

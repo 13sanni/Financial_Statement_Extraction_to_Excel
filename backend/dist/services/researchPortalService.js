@@ -5,6 +5,7 @@ exports.getPortalUploadQueue = getPortalUploadQueue;
 exports.getPortalRuns = getPortalRuns;
 exports.getPortalDownloads = getPortalDownloads;
 const env_1 = require("../config/env");
+const extractionJob_1 = require("../models/extractionJob");
 const extractionRun_1 = require("../models/extractionRun");
 function paginateRows(rows, { page, pageSize }) {
     const totalItems = rows.length;
@@ -73,11 +74,31 @@ async function loadRunsFromDb() {
         .lean();
     return rows;
 }
+async function loadJobsFromDb() {
+    if (!(0, env_1.hasMongoConfig)())
+        return [];
+    const rows = await extractionJob_1.ExtractionJobModel.find()
+        .sort({ createdAt: -1 })
+        .select({
+        jobId: 1,
+        runId: 1,
+        status: 1,
+        originalName: 1,
+        uploadedBy: 1,
+        years: 1,
+        extractedRowCount: 1,
+        createdAt: 1,
+        _id: 0,
+    })
+        .lean();
+    return rows;
+}
 async function getPortalSummary() {
-    const runs = await loadRunsFromDb();
+    const [runs, jobs] = await Promise.all([loadRunsFromDb(), loadJobsFromDb()]);
     const statementsProcessed = runs.reduce((sum, run) => sum + run.uploadedPdfs.length, 0);
     const completedRuns = runs.filter((run) => run.status === "completed").length;
     const failedRuns = runs.filter((run) => run.status === "failed").length;
+    const queuedJobs = jobs.filter((job) => job.status === "queued" || job.status === "processing").length;
     const totalRuns = completedRuns + failedRuns;
     const successRate = totalRuns ? ((completedRuns / totalRuns) * 100).toFixed(1) : "0.0";
     const exportsReady = runs.filter((run) => Boolean(run.outputExcel)).length;
@@ -89,8 +110,8 @@ async function getPortalSummary() {
         },
         {
             label: "Queued for Extraction",
-            value: "0",
-            delta: "Memory pipeline (no queue)",
+            value: String(queuedJobs),
+            delta: queuedJobs ? "Live jobs in pipeline" : "No queued jobs",
         },
         {
             label: "Accuracy Score",
@@ -105,13 +126,15 @@ async function getPortalSummary() {
     ];
 }
 async function getPortalUploadQueue(options) {
-    const runs = await loadRunsFromDb();
-    const uploadQueue = runs.flatMap((run) => run.uploadedPdfs.map((pdf) => ({
-        company: humanizeFileName(pdf.originalName),
-        period: formatPeriod(pdf.years),
-        pages: pdf.extractedRowCount,
-        uploadedBy: "System",
-    })));
+    const jobs = await loadJobsFromDb();
+    const uploadQueue = jobs
+        .filter((job) => job.status === "queued" || job.status === "processing")
+        .map((job) => ({
+        company: humanizeFileName(job.originalName),
+        period: formatPeriod(job.years),
+        pages: job.extractedRowCount,
+        uploadedBy: job.uploadedBy || "System",
+    }));
     const normalizedQuery = options.query.toLowerCase();
     const filtered = uploadQueue
         .filter((item) => {
@@ -130,13 +153,33 @@ async function getPortalUploadQueue(options) {
     return paginateRows(filtered, options);
 }
 async function getPortalRuns(options) {
-    const runItems = (await loadRunsFromDb()).map((run) => ({
+    const [runs, jobs] = await Promise.all([loadRunsFromDb(), loadJobsFromDb()]);
+    const completedRunItems = runs.map((run) => ({
         id: run.runId,
         company: run.uploadedPdfs[0] ? humanizeFileName(run.uploadedPdfs[0].originalName) : "Unknown Company",
         started: formatTime(run.createdAt),
         status: run.status === "failed" ? "review" : "completed",
         confidence: calculateRunConfidencePercent(run),
     }));
+    const activeJobGroups = jobs
+        .filter((job) => job.status === "queued" || job.status === "processing")
+        .reduce((acc, job) => {
+        const list = acc.get(job.runId) || [];
+        list.push(job);
+        acc.set(job.runId, list);
+        return acc;
+    }, new Map());
+    const activeRunItems = [...activeJobGroups.entries()].map(([runId, groupedJobs]) => {
+        const first = groupedJobs[0];
+        return {
+            id: runId,
+            company: humanizeFileName(first?.originalName || "Unknown Company"),
+            started: formatTime(first?.createdAt || new Date()),
+            status: "processing",
+            confidence: "In Progress",
+        };
+    });
+    const runItems = [...activeRunItems, ...completedRunItems];
     const normalizedQuery = options.query.toLowerCase();
     const filtered = runItems.filter((run) => {
         const matchesQuery = !normalizedQuery || `${run.company} ${run.id} ${run.started}`.toLowerCase().includes(normalizedQuery);

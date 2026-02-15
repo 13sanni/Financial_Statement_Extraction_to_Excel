@@ -1,4 +1,5 @@
 import { hasMongoConfig } from "../config/env";
+import { ExtractionJobModel } from "../models/extractionJob";
 import { ExtractionRunModel } from "../models/extractionRun";
 
 type SummaryCard = {
@@ -69,6 +70,17 @@ type RunRecord = {
     years: string[];
   }>;
   outputExcel?: { fileName: string; sizeBytes: number; cloudinaryUrl: string } | undefined;
+};
+
+type JobRecord = {
+  jobId: string;
+  runId: string;
+  status: "queued" | "processing" | "completed" | "failed";
+  originalName: string;
+  uploadedBy: string;
+  years: string[];
+  extractedRowCount: number;
+  createdAt: Date;
 };
 
 function paginateRows<T>(rows: T[], { page, pageSize }: PaginationOptions): PaginatedResult<T> {
@@ -142,11 +154,31 @@ async function loadRunsFromDb(): Promise<RunRecord[]> {
   return rows;
 }
 
+async function loadJobsFromDb(): Promise<JobRecord[]> {
+  if (!hasMongoConfig()) return [];
+  const rows = await ExtractionJobModel.find()
+    .sort({ createdAt: -1 })
+    .select({
+      jobId: 1,
+      runId: 1,
+      status: 1,
+      originalName: 1,
+      uploadedBy: 1,
+      years: 1,
+      extractedRowCount: 1,
+      createdAt: 1,
+      _id: 0,
+    })
+    .lean<JobRecord[]>();
+  return rows;
+}
+
 export async function getPortalSummary(): Promise<SummaryCard[]> {
-  const runs = await loadRunsFromDb();
+  const [runs, jobs] = await Promise.all([loadRunsFromDb(), loadJobsFromDb()]);
   const statementsProcessed = runs.reduce((sum, run) => sum + run.uploadedPdfs.length, 0);
   const completedRuns = runs.filter((run) => run.status === "completed").length;
   const failedRuns = runs.filter((run) => run.status === "failed").length;
+  const queuedJobs = jobs.filter((job) => job.status === "queued" || job.status === "processing").length;
   const totalRuns = completedRuns + failedRuns;
   const successRate = totalRuns ? ((completedRuns / totalRuns) * 100).toFixed(1) : "0.0";
   const exportsReady = runs.filter((run) => Boolean(run.outputExcel)).length;
@@ -159,8 +191,8 @@ export async function getPortalSummary(): Promise<SummaryCard[]> {
     },
     {
       label: "Queued for Extraction",
-      value: "0",
-      delta: "Memory pipeline (no queue)",
+      value: String(queuedJobs),
+      delta: queuedJobs ? "Live jobs in pipeline" : "No queued jobs",
     },
     {
       label: "Accuracy Score",
@@ -176,15 +208,15 @@ export async function getPortalSummary(): Promise<SummaryCard[]> {
 }
 
 export async function getPortalUploadQueue(options: UploadQueueOptions): Promise<PaginatedResult<UploadQueueItem>> {
-  const runs = await loadRunsFromDb();
-  const uploadQueue = runs.flatMap((run) =>
-    run.uploadedPdfs.map((pdf) => ({
-      company: humanizeFileName(pdf.originalName),
-      period: formatPeriod(pdf.years),
-      pages: pdf.extractedRowCount,
-      uploadedBy: "System",
-    })),
-  );
+  const jobs = await loadJobsFromDb();
+  const uploadQueue = jobs
+    .filter((job) => job.status === "queued" || job.status === "processing")
+    .map((job) => ({
+      company: humanizeFileName(job.originalName),
+      period: formatPeriod(job.years),
+      pages: job.extractedRowCount,
+      uploadedBy: job.uploadedBy || "System",
+    }));
 
   const normalizedQuery = options.query.toLowerCase();
   const filtered = uploadQueue
@@ -203,13 +235,35 @@ export async function getPortalUploadQueue(options: UploadQueueOptions): Promise
 }
 
 export async function getPortalRuns(options: RunsOptions): Promise<PaginatedResult<RunItem>> {
-  const runItems: RunItem[] = (await loadRunsFromDb()).map((run) => ({
+  const [runs, jobs] = await Promise.all([loadRunsFromDb(), loadJobsFromDb()]);
+  const completedRunItems: RunItem[] = runs.map((run) => ({
     id: run.runId,
     company: run.uploadedPdfs[0] ? humanizeFileName(run.uploadedPdfs[0].originalName) : "Unknown Company",
     started: formatTime(run.createdAt),
     status: run.status === "failed" ? "review" : "completed",
     confidence: calculateRunConfidencePercent(run),
   }));
+  const activeJobGroups = jobs
+    .filter((job) => job.status === "queued" || job.status === "processing")
+    .reduce((acc, job) => {
+      const list = acc.get(job.runId) || [];
+      list.push(job);
+      acc.set(job.runId, list);
+      return acc;
+    }, new Map<string, JobRecord[]>());
+
+  const activeRunItems: RunItem[] = [...activeJobGroups.entries()].map(([runId, groupedJobs]) => {
+    const first = groupedJobs[0];
+    return {
+      id: runId,
+      company: humanizeFileName(first?.originalName || "Unknown Company"),
+      started: formatTime(first?.createdAt || new Date()),
+      status: "processing",
+      confidence: "In Progress",
+    };
+  });
+
+  const runItems = [...activeRunItems, ...completedRunItems];
 
   const normalizedQuery = options.query.toLowerCase();
   const filtered = runItems.filter((run) => {
