@@ -23,6 +23,9 @@ exports.env = {
     corsOrigin: process.env.CORS_ORIGIN || "",
     adminEmail: process.env.ADMIN_EMAIL || "",
     adminPassword: process.env.ADMIN_PASSWORD || "",
+    enableHttpLogs: process.env.ENABLE_HTTP_LOGS !== undefined
+        ? process.env.ENABLE_HTTP_LOGS === "true"
+        : process.env.NODE_ENV !== "production",
 };
 function hasGeminiConfig() {
     return Boolean(exports.env.geminiApiKey);
