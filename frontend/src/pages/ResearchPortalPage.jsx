@@ -13,9 +13,8 @@ import {
   getUploadQueue,
 } from "../services/researchPortalService";
 
-const PAGE_SIZE = 2;
 const POLL_INTERVAL_MS = 4000;
-const initialPagedData = { items: [], page: 1, pageSize: PAGE_SIZE, totalItems: 0, totalPages: 1 };
+const initialPagedData = { items: [], page: 1, pageSize: 5, totalItems: 0, totalPages: 1 };
 
 function ResearchPortalPage() {
   const sectionHeadClass = "mb-3 flex items-center justify-between gap-3";
@@ -32,6 +31,9 @@ function ResearchPortalPage() {
   const [uploadPage, setUploadPage] = useState(1);
   const [runsPage, setRunsPage] = useState(1);
   const [downloadsPage, setDownloadsPage] = useState(1);
+  const [uploadPageSize, setUploadPageSize] = useState(5);
+  const [runsPageSize, setRunsPageSize] = useState(5);
+  const [downloadsPageSize, setDownloadsPageSize] = useState(5);
   const [isSummaryLoading, setIsSummaryLoading] = useState(true);
   const [isListLoading, setIsListLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -57,7 +59,7 @@ function ResearchPortalPage() {
     setUploadPage(1);
     setRunsPage(1);
     setDownloadsPage(1);
-  }, [debouncedQuery, uploadSort, runStatus, runSort, downloadSort]);
+  }, [debouncedQuery, uploadSort, runStatus, runSort, downloadSort, uploadPageSize, runsPageSize, downloadsPageSize]);
 
   useEffect(() => {
     let isMounted = true;
@@ -91,20 +93,20 @@ function ResearchPortalPage() {
             query: debouncedQuery,
             sort: uploadSort,
             page: uploadPage,
-            pageSize: PAGE_SIZE,
+            pageSize: uploadPageSize,
           }),
           getRuns({
             query: debouncedQuery,
             status: runStatus,
             sort: runSort,
             page: runsPage,
-            pageSize: PAGE_SIZE,
+            pageSize: runsPageSize,
           }),
           getDownloads({
             query: debouncedQuery,
             sort: downloadSort,
             page: downloadsPage,
-            pageSize: PAGE_SIZE,
+            pageSize: downloadsPageSize,
           }),
         ]);
 
@@ -125,7 +127,7 @@ function ResearchPortalPage() {
     return () => {
       isMounted = false;
     };
-  }, [debouncedQuery, downloadSort, downloadsPage, refreshTick, runSort, runStatus, runsPage, uploadPage, uploadSort]);
+  }, [debouncedQuery, downloadSort, downloadsPage, downloadsPageSize, refreshTick, runSort, runStatus, runsPage, runsPageSize, uploadPage, uploadPageSize, uploadSort]);
 
   useEffect(() => {
     if (queuedCount <= 0) return;
@@ -385,9 +387,23 @@ function ResearchPortalPage() {
         <Panel as="article">
           <div className={sectionHeadClass}>
             <h3 className="text-base font-semibold text-slate-900">Upload Queue</h3>
-            <Button variant="secondary" onClick={openFilePicker}>
-              Add Statement
-            </Button>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
+                Page Size
+                <select
+                  className="ml-2 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900"
+                  value={uploadPageSize}
+                  onChange={(event) => setUploadPageSize(Number(event.target.value))}
+                >
+                  <option value={3}>3</option>
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                </select>
+              </label>
+              <Button variant="secondary" onClick={openFilePicker}>
+                Add Statement
+              </Button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
@@ -466,14 +482,28 @@ function ResearchPortalPage() {
         <Panel as="article">
           <div className={sectionHeadClass}>
             <h3 className="text-base font-semibold text-slate-900">Extraction Runs</h3>
-            <Button
-              variant="primary"
-              onClick={handleStartRun}
-              disabled={isRunSubmitting}
-              className={isRunSubmitting ? "cursor-not-allowed opacity-60" : ""}
-            >
-              {isRunSubmitting ? "Running..." : "Start Run"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
+                Page Size
+                <select
+                  className="ml-2 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900"
+                  value={runsPageSize}
+                  onChange={(event) => setRunsPageSize(Number(event.target.value))}
+                >
+                  <option value={3}>3</option>
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                </select>
+              </label>
+              <Button
+                variant="primary"
+                onClick={handleStartRun}
+                disabled={isRunSubmitting}
+                className={isRunSubmitting ? "cursor-not-allowed opacity-60" : ""}
+              >
+                {isRunSubmitting ? "Running..." : "Start Run"}
+              </Button>
+            </div>
           </div>
           <ul className="grid gap-3">
             {runs.items.map((run) => (
@@ -652,9 +682,23 @@ function ResearchPortalPage() {
         <Panel as="article" className="lg:col-span-2">
           <div className={sectionHeadClass}>
             <h3 className="text-base font-semibold text-slate-900">Latest Excel Exports</h3>
-            <Button variant="secondary" onClick={() => setDownloadsPage(1)}>
-              View All
-            </Button>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500">
+                Page Size
+                <select
+                  className="ml-2 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900"
+                  value={downloadsPageSize}
+                  onChange={(event) => setDownloadsPageSize(Number(event.target.value))}
+                >
+                  <option value={3}>3</option>
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                </select>
+              </label>
+              <Button variant="secondary" onClick={() => setDownloadsPage(1)}>
+                View All
+              </Button>
+            </div>
           </div>
           <ul className="grid gap-3">
             {downloads.items.map((download) => (
